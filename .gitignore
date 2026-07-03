@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local SQLite databases (superseded by hosted Postgres)
+*.db
+
 # User-specific files
 *.rsuser
 *.suo
