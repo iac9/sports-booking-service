@@ -28,6 +28,7 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()));
 
 builder.Services.AddScoped<CostService>();
+builder.Services.AddScoped<EventMapper>();
 
 var app = builder.Build();
 

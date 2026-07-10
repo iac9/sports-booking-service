@@ -9,7 +9,7 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups/{groupId:guid}/events")]
-public class EventsController(AppDbContext db, CostService costService) : ControllerBase
+public class EventsController(AppDbContext db, EventMapper eventMapper) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<EventSummaryResponse>>> List(Guid groupId, [FromQuery] string? status)
@@ -31,15 +31,15 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
 
         return Ok(events.Select(e => new EventSummaryResponse(
             e.Id, e.Title, e.Date.ToString("yyyy-MM-dd"),
-            StatusString(e.Status), e.Attendees.Count, e.MaxAttendees,
+            EventMapper.StatusString(e.Status), e.Attendees.Count, e.MaxAttendees,
             e.Location?.Name)).ToList());
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EventDetailResponse>> Get(Guid groupId, Guid id)
     {
-        var ev = await LoadEvent(groupId, id);
-        return ev is null ? NotFound() : Ok(MapDetail(ev));
+        var ev = await eventMapper.LoadEvent(groupId, id);
+        return ev is null ? NotFound() : Ok(eventMapper.MapDetail(ev));
     }
 
     [HttpPost]
@@ -82,11 +82,11 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
         db.Events.Add(ev);
         await db.SaveChangesAsync();
 
-        var created = await LoadEvent(groupId, ev.Id);
-        return CreatedAtAction(nameof(Get), new { groupId, id = ev.Id }, MapDetail(created!));
+        var created = await eventMapper.LoadEvent(groupId, ev.Id);
+        return CreatedAtAction(nameof(Get), new { groupId, id = ev.Id }, eventMapper.MapDetail(created!));
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPatch("{id:guid}")]
     public async Task<ActionResult<EventDetailResponse>> Update(Guid groupId, Guid id, UpdateEventRequest request)
     {
         var ev = await db.Events
@@ -127,8 +127,8 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
         }
 
         await db.SaveChangesAsync();
-        var updated = await LoadEvent(groupId, id);
-        return Ok(MapDetail(updated!));
+        var updated = await eventMapper.LoadEvent(groupId, id);
+        return Ok(eventMapper.MapDetail(updated!));
     }
 
     [HttpDelete("{id:guid}")]
@@ -163,7 +163,7 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
             ev.Waitlist.Add(new WaitlistEntry { EventId = id, MemberId = request.MemberId, JoinedAt = DateTime.UtcNow });
 
         await db.SaveChangesAsync();
-        return Ok(MapDetail((await LoadEvent(groupId, id))!));
+        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
 
     [HttpDelete("{id:guid}/rsvp/{memberId:guid}")]
@@ -194,7 +194,7 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
         }
 
         await db.SaveChangesAsync();
-        return Ok(MapDetail((await LoadEvent(groupId, id))!));
+        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
 
     // ── Expenses ─────────────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
         }
 
         await db.SaveChangesAsync();
-        return Ok(MapDetail((await LoadEvent(groupId, id))!));
+        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
 
     // ── Location option votes ─────────────────────────────────────────────────────
@@ -284,7 +284,7 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
 
         option.Votes.Add(new LocationVote { LocationOptionId = optionId, MemberId = request.MemberId });
         await db.SaveChangesAsync();
-        return Ok(MapDetail((await LoadEvent(groupId, id))!));
+        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
 
     [HttpDelete("{id:guid}/location-options/{optionId:guid}/votes/{memberId:guid}")]
@@ -296,46 +296,6 @@ public class EventsController(AppDbContext db, CostService costService) : Contro
         if (vote is null) return NotFound();
         db.LocationVotes.Remove(vote);
         await db.SaveChangesAsync();
-        return Ok(MapDetail((await LoadEvent(groupId, id))!));
+        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────────
-
-    private async Task<Event?> LoadEvent(Guid groupId, Guid id) =>
-        await db.Events
-            .Include(e => e.Location)
-            .Include(e => e.CourtBookings)
-            .Include(e => e.Attendees).ThenInclude(a => a.Member)
-            .Include(e => e.Waitlist).ThenInclude(w => w.Member)
-            .Include(e => e.Expenses).ThenInclude(ex => ex.PaidBy)
-            .Include(e => e.LocationOptions).ThenInclude(lo => lo.Votes).ThenInclude(v => v.Member)
-            .Include(e => e.CreatedBy)
-            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-
-    private EventDetailResponse MapDetail(Event ev) => new(
-        ev.Id,
-        ev.Title,
-        ev.Date.ToString("yyyy-MM-dd"),
-        ev.CourtBookings.Select(cb => new CourtBookingResponse(cb.Id, cb.Court, cb.StartTime, cb.EndTime)).ToList(),
-        ev.LocationId,
-        ev.Location?.Name,
-        ev.MaxAttendees,
-        ev.Attendees.OrderBy(a => a.JoinedAt).Select(a => new MemberResponse(a.Member.Id, a.Member.Name)).ToList(),
-        ev.Waitlist.OrderBy(w => w.JoinedAt).Select(w => new MemberResponse(w.Member.Id, w.Member.Name)).ToList(),
-        ev.Expenses.OrderBy(e => e.CreatedAt).Select(e => new ExpenseResponse(
-            e.Id, e.Description, e.Amount,
-            new MemberResponse(e.PaidBy.Id, e.PaidBy.Name),
-            e.CreatedAt.ToString("o"))).ToList(),
-        new MemberResponse(ev.CreatedBy.Id, ev.CreatedBy.Name),
-        StatusString(ev.Status),
-        ev.Status == EventStatus.Draft
-            ? ev.LocationOptions.Select(lo => new LocationOptionResponse(
-                lo.Id, lo.LocationName,
-                lo.Votes.Select(v => new MemberResponse(v.Member.Id, v.Member.Name)).ToList())).ToList()
-            : null,
-        costService.Calculate(ev.Attendees, ev.Expenses)
-    );
-
-    private static string StatusString(EventStatus status) =>
-        status == EventStatus.Draft ? "draft" : "confirmed";
 }

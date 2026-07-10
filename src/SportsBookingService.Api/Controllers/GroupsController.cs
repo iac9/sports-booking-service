@@ -3,26 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
 using SportsBookingService.Api.Models;
+using SportsBookingService.Api.Services;
 
 namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups")]
-public class GroupsController(AppDbContext db) : ControllerBase
+public class GroupsController(AppDbContext db, EventMapper eventMapper) : ControllerBase
 {
     [HttpGet("code/{code}")]
     public async Task<ActionResult<GroupResponse>> GetByCode(string code)
     {
-        var group = await db.Groups
-            .Include(g => g.Members)
-            .Include(g => g.Locations)
+        var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
             .FirstOrDefaultAsync(g => g.Code == code.ToUpperInvariant());
 
-        return group is null ? NotFound() : Ok(MapGroup(group));
+        return group is null ? NotFound() : Ok(eventMapper.MapGroup(group));
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateGroupResponse>> Create(CreateGroupRequest request)
+    public async Task<ActionResult<GroupResponse>> Create(CreateGroupRequest request)
     {
         var group = new Group
         {
@@ -31,29 +30,26 @@ public class GroupsController(AppDbContext db) : ControllerBase
             Code = GenerateCode(),
         };
 
-        var creator = new Member { Id = Guid.NewGuid(), Name = request.CreatorName, GroupId = group.Id };
+        var creator = new Member { Id = request.CreatorId, Name = request.CreatorName, GroupId = group.Id };
         group.Members.Add(creator);
 
         db.Groups.Add(group);
         await db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetByCode), new { code = group.Code },
-            new CreateGroupResponse(group.Id, group.Name, group.Code, creator.Id));
+        return CreatedAtAction(nameof(GetByCode), new { code = group.Code }, eventMapper.MapGroup(group));
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPatch("{id:guid}")]
     public async Task<ActionResult<GroupResponse>> Rename(Guid id, RenameGroupRequest request)
     {
-        var group = await db.Groups
-            .Include(g => g.Members)
-            .Include(g => g.Locations)
+        var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
             .FirstOrDefaultAsync(g => g.Id == id);
 
         if (group is null) return NotFound();
 
         group.Name = request.Name;
         await db.SaveChangesAsync();
-        return Ok(MapGroup(group));
+        return Ok(eventMapper.MapGroup(group));
     }
 
     [HttpDelete("{id:guid}")]
@@ -85,7 +81,7 @@ public class GroupsController(AppDbContext db) : ControllerBase
         var groupExists = await db.Groups.AnyAsync(g => g.Id == id);
         if (!groupExists) return NotFound();
 
-        var member = new Member { Id = Guid.NewGuid(), Name = request.Name, GroupId = id };
+        var member = new Member { Id = request.MemberId, Name = request.Name, GroupId = id };
         db.Members.Add(member);
         await db.SaveChangesAsync();
 
@@ -104,13 +100,37 @@ public class GroupsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
-    private static GroupResponse MapGroup(Group group) => new(
-        group.Id,
-        group.Name,
-        group.Code,
-        group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
-        group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList()
-    );
+    [HttpPost("join")]
+    public async Task<ActionResult<GroupResponse?>> JoinByCode(JoinGroupByCodeRequest request)
+    {
+        var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
+            .FirstOrDefaultAsync(g => g.Code == request.Code.Trim().ToUpperInvariant());
+
+        if (group is null) return Ok((GroupResponse?)null);
+
+        if (!group.Members.Any(m => m.Id == request.MemberId))
+        {
+            var member = new Member { Id = request.MemberId, Name = request.MemberName, GroupId = group.Id };
+            group.Members.Add(member);
+            await db.SaveChangesAsync();
+        }
+
+        return Ok(eventMapper.MapGroup(group));
+    }
+
+    [HttpPut("{id:guid}/primary-location")]
+    public async Task<IActionResult> SetPrimaryLocation(Guid id, SetPrimaryLocationRequest request)
+    {
+        var group = await db.Groups.Include(g => g.Locations).FirstOrDefaultAsync(g => g.Id == id);
+        if (group is null) return NotFound();
+
+        if (request.LocationId is not null && !group.Locations.Any(l => l.Id == request.LocationId))
+            return BadRequest("Location does not belong to this group.");
+
+        group.PrimaryLocationId = request.LocationId;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
 
     private static string GenerateCode()
     {

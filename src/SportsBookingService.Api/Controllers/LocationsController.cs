@@ -41,14 +41,14 @@ public class LocationsController(AppDbContext db) : ControllerBase
         return CreatedAtAction(nameof(List), new { groupId }, response);
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPatch("{id:guid}")]
     public async Task<ActionResult<LocationResponse>> Update(Guid groupId, Guid id, UpdateLocationRequest request)
     {
         var location = await db.Locations.FirstOrDefaultAsync(l => l.Id == id && l.GroupId == groupId);
         if (location is null) return NotFound();
 
-        location.Name = request.Name;
-        location.Address = request.Address;
+        if (request.Name is not null) location.Name = request.Name;
+        if (request.Address is not null) location.Address = request.Address;
         await db.SaveChangesAsync();
 
         return Ok(new LocationResponse(location.Id, location.Name, location.Address));
