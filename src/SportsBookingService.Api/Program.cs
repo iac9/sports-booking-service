@@ -57,7 +57,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseForwardedHeaders();
 app.UseCors();
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok());
