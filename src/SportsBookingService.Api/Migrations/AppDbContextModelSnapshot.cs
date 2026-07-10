@@ -229,6 +229,9 @@ namespace SportsBookingService.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ClerkUserId")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
@@ -238,7 +241,9 @@ namespace SportsBookingService.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GroupId");
+                    b.HasIndex("GroupId", "ClerkUserId")
+                        .IsUnique()
+                        .HasFilter("\"ClerkUserId\" IS NOT NULL");
 
                     b.ToTable("Members");
                 });

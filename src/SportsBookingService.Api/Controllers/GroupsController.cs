@@ -9,7 +9,7 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups")]
-public class GroupsController(AppDbContext db, EventMapper eventMapper) : ControllerBase
+public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentMemberService currentMemberService) : ControllerBase
 {
     [HttpGet("code/{code}")]
     public async Task<ActionResult<GroupResponse>> GetByCode(string code)
@@ -17,7 +17,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
         var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
             .FirstOrDefaultAsync(g => g.Code == code.ToUpperInvariant());
 
-        return group is null ? NotFound() : Ok(eventMapper.MapGroup(group));
+        return group is null ? NotFound() : Ok(await eventMapper.MapGroupAsync(group));
     }
 
     [HttpPost]
@@ -30,13 +30,13 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
             Code = GenerateCode(),
         };
 
-        var creator = new Member { Id = request.CreatorId, Name = request.CreatorName, GroupId = group.Id };
+        var creator = new Member { Id = Guid.NewGuid(), Name = request.CreatorName, GroupId = group.Id, ClerkUserId = currentMemberService.GetClerkUserId() };
         group.Members.Add(creator);
 
         db.Groups.Add(group);
         await db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetByCode), new { code = group.Code }, eventMapper.MapGroup(group));
+        return CreatedAtAction(nameof(GetByCode), new { code = group.Code }, await eventMapper.MapGroupAsync(group));
     }
 
     [HttpPatch("{id:guid}")]
@@ -49,7 +49,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
 
         group.Name = request.Name;
         await db.SaveChangesAsync();
-        return Ok(eventMapper.MapGroup(group));
+        return Ok(await eventMapper.MapGroupAsync(group));
     }
 
     [HttpDelete("{id:guid}")]
@@ -81,7 +81,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
         var groupExists = await db.Groups.AnyAsync(g => g.Id == id);
         if (!groupExists) return NotFound();
 
-        var member = new Member { Id = request.MemberId, Name = request.Name, GroupId = id };
+        var member = new Member { Id = Guid.NewGuid(), Name = request.Name, GroupId = id, ClerkUserId = currentMemberService.GetClerkUserId() };
         db.Members.Add(member);
         await db.SaveChangesAsync();
 
@@ -89,10 +89,10 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
             new MemberResponse(member.Id, member.Name));
     }
 
-    [HttpDelete("{id:guid}/members/{memberId:guid}")]
-    public async Task<IActionResult> LeaveGroup(Guid id, Guid memberId)
+    [HttpDelete("{id:guid}/members/me")]
+    public async Task<IActionResult> LeaveGroup(Guid id)
     {
-        var member = await db.Members.FirstOrDefaultAsync(m => m.Id == memberId && m.GroupId == id);
+        var member = await currentMemberService.FindMemberAsync(id);
         if (member is null) return NotFound();
 
         db.Members.Remove(member);
@@ -108,14 +108,15 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper) : Contro
 
         if (group is null) return Ok((GroupResponse?)null);
 
-        if (!group.Members.Any(m => m.Id == request.MemberId))
+        var clerkUserId = currentMemberService.GetClerkUserId();
+        if (!group.Members.Any(m => m.ClerkUserId == clerkUserId))
         {
-            var member = new Member { Id = request.MemberId, Name = request.MemberName, GroupId = group.Id };
+            var member = new Member { Id = Guid.NewGuid(), Name = request.MemberName, GroupId = group.Id, ClerkUserId = clerkUserId };
             group.Members.Add(member);
             await db.SaveChangesAsync();
         }
 
-        return Ok(eventMapper.MapGroup(group));
+        return Ok(await eventMapper.MapGroupAsync(group));
     }
 
     [HttpPut("{id:guid}/primary-location")]

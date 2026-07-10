@@ -9,7 +9,8 @@ public record GroupResponse(
     List<MemberResponse> Members,
     List<EventDetailResponse> Events,
     List<LocationResponse> Locations,
-    Guid? PrimaryLocationId
+    Guid? PrimaryLocationId,
+    Guid? CurrentMemberId
 );
 
 public record LocationResponse(Guid Id, string Name, string Address);

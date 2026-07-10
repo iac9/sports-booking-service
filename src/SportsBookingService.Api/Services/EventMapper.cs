@@ -5,7 +5,7 @@ using SportsBookingService.Api.Models;
 
 namespace SportsBookingService.Api.Services;
 
-public class EventMapper(AppDbContext db, CostService costService)
+public class EventMapper(AppDbContext db, CostService costService, CurrentMemberService currentMemberService)
 {
     public async Task<Event?> LoadEvent(Guid groupId, Guid id) =>
         await IncludeFullGraph(db.Events)
@@ -57,15 +57,20 @@ public class EventMapper(AppDbContext db, CostService costService)
         costService.Calculate(ev.Attendees, ev.Expenses)
     );
 
-    public GroupResponse MapGroup(Group group) => new(
-        group.Id,
-        group.Name,
-        group.Code,
-        group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
-        group.Events.OrderBy(e => e.Date).Select(MapDetail).ToList(),
-        group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
-        group.PrimaryLocationId
-    );
+    public async Task<GroupResponse> MapGroupAsync(Group group)
+    {
+        var currentMember = await currentMemberService.FindMemberAsync(group.Id);
+        return new(
+            group.Id,
+            group.Name,
+            group.Code,
+            group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
+            group.Events.OrderBy(e => e.Date).Select(MapDetail).ToList(),
+            group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
+            group.PrimaryLocationId,
+            currentMember?.Id
+        );
+    }
 
     public static string StatusString(EventStatus status) =>
         status == EventStatus.Draft ? "draft" : "confirmed";

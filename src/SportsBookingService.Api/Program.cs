@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using SportsBookingService.Api.Auth;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.Services;
 
@@ -8,6 +13,28 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+
+var clerkFrontendApiUrl = builder.Configuration["Clerk:FrontendApiUrl"]
+    ?? throw new InvalidOperationException("Configuration 'Clerk:FrontendApiUrl' is not set.");
+var clerkJwksAddress = $"{clerkFrontendApiUrl}/.well-known/jwks.json";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            clerkJwksAddress,
+            new ClerkJwksConfigurationRetriever(),
+            new HttpDocumentRetriever { RequireHttps = true });
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = clerkFrontendApiUrl,
+            ValidateAudience = false,
+        };
+    });
+builder.Services.AddAuthorization();
 
 string connectionString;
 if (builder.Environment.IsDevelopment())
@@ -40,6 +67,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<CostService>();
 builder.Services.AddScoped<EventMapper>();
+builder.Services.AddScoped<CurrentMemberService>();
 
 var app = builder.Build();
 
@@ -61,8 +89,9 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 app.MapGet("/health", () => Results.Ok());
 
 app.Run();

@@ -41,5 +41,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Group>()
             .HasIndex(g => g.Code)
             .IsUnique();
+
+        modelBuilder.Entity<Member>()
+            .HasIndex(m => new { m.GroupId, m.ClerkUserId })
+            .IsUnique()
+            .HasFilter("\"ClerkUserId\" IS NOT NULL");
     }
 }
