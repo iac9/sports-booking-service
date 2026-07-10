@@ -27,7 +27,7 @@ tests/SportsBookingService.Api.Tests/
 
 ## Local development
 
-Requires the .NET 10 SDK and a PostgreSQL database — either a local instance or a [Neon](https://neon.tech) project/branch. The app reads a single connection string, `ConnectionStrings:DefaultConnection`, regardless of which one you point it at.
+Requires the .NET 10 SDK and a PostgreSQL database — either a local instance or a [Neon](https://neon.tech) project/branch. In `Development`, which one is used is controlled by the `Database:UseNeon` flag in [appsettings.Development.json](src/SportsBookingService.Api/appsettings.Development.json) (defaults to `false`, i.e. local); outside `Development` (e.g. the hosted Docker image), the app reads a single `ConnectionStrings:DefaultConnection` instead.
 
 ### First-time Neon setup
 
@@ -39,20 +39,19 @@ If you don't already have a Neon project (e.g. you're pulling this repo fresh an
    ```
    Host=<project>.<region>.aws.neon.tech;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true
    ```
-4. Use that string as `DefaultConnection` in step 1 below. Migrations run automatically on `dotnet run`, so no manual schema setup is needed — the first run against a fresh Neon database creates all tables.
+4. Use that string as `ConnectionStrings:Neon` in step 1 below. Migrations run automatically on `dotnet run`, so no manual schema setup is needed — the first run against a fresh Neon database creates all tables.
 
 Free-tier Neon projects scale to zero after a period of inactivity; the next request just triggers a cold start (a second or two) rather than failing.
 
-1. Configure the connection string via user secrets (do not commit it to `appsettings.json`):
+1. Configure both connection strings via user secrets (do not commit them to `appsettings.json`) — you can keep both stored at once:
    ```bash
    # Local Postgres
-   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=sports_booking;Username=postgres;Password=postgres" --project src/SportsBookingService.Api
+   dotnet user-secrets set "ConnectionStrings:Local" "Host=localhost;Database=sports_booking;Username=postgres;Password=postgres" --project src/SportsBookingService.Api
 
    # Neon (get the connection string from the Neon console — requires SSL)
-   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=<project>.neon.tech;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true" --project src/SportsBookingService.Api
+   dotnet user-secrets set "ConnectionStrings:Neon" "Host=<project>.neon.tech;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true" --project src/SportsBookingService.Api
    ```
-   Switching between local and Neon means re-running the `user-secrets set` command with the other value — only one `DefaultConnection` is active at a time.
-2. Run the API — migrations are applied automatically on startup:
+2. Pick which one to run against by setting `Database:UseNeon` in [appsettings.Development.json](src/SportsBookingService.Api/appsettings.Development.json) (`false` = local, `true` = Neon), then run the API — migrations are applied automatically on startup:
    ```bash
    dotnet run --project src/SportsBookingService.Api
    ```

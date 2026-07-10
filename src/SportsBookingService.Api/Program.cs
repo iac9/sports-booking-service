@@ -9,8 +9,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+string connectionString;
+if (builder.Environment.IsDevelopment())
+{
+    var useNeon = builder.Configuration.GetValue<bool>("Database:UseNeon");
+    var key = useNeon ? "Neon" : "Local";
+    connectionString = builder.Configuration.GetConnectionString(key)
+        ?? throw new InvalidOperationException($"Connection string '{key}' is not configured. Set it via 'dotnet user-secrets set \"ConnectionStrings:{key}\" \"...\"'.");
+}
+else
+{
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+}
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 

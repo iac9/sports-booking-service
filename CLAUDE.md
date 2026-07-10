@@ -77,12 +77,15 @@ This logic lives in `Services/CostService.cs`. Never replicate it elsewhere — 
 
 Requires the .NET 10 SDK and a PostgreSQL database — either local, or a [Neon](https://neon.tech) project/branch (the production/hosted database).
 
+In `Development`, the `Database:UseNeon` flag in `appsettings.Development.json` picks between two user-secret keys, `ConnectionStrings:Local` and `ConnectionStrings:Neon` (see `Program.cs`). Outside `Development` (e.g. the Docker image), the app reads a single `ConnectionStrings:DefaultConnection` instead — set via `ConnectionStrings__DefaultConnection` env var.
+
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=sports_booking;Username=postgres;Password=postgres" --project src/SportsBookingService.Api
+dotnet user-secrets set "ConnectionStrings:Local" "Host=localhost;Database=sports_booking;Username=postgres;Password=postgres" --project src/SportsBookingService.Api
+dotnet user-secrets set "ConnectionStrings:Neon" "Host=<project>.neon.tech;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Trust Server Certificate=true" --project src/SportsBookingService.Api
 dotnet run --project src/SportsBookingService.Api
 ```
 
-Since Neon speaks standard Postgres wire protocol, no EF Core / Npgsql code changes are needed to target it — just swap the connection string (add `SSL Mode=Require`).
+Since Neon speaks standard Postgres wire protocol, no EF Core / Npgsql code changes are needed to target it — just swap which connection string is active.
 
 Migrations apply automatically on startup. CORS is restricted to `http://localhost:5173` and `https://sports-booking-ui.vercel.app`.
 
