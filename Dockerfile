@@ -12,4 +12,5 @@ WORKDIR /app
 COPY --from=build /app .
 
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
 CMD ASPNETCORE_URLS=http://+:$PORT dotnet SportsBookingService.Api.dll
