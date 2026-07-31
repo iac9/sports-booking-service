@@ -11,7 +11,7 @@ public record GroupResponse(
     List<LocationResponse> Locations,
     Guid? PrimaryLocationId,
     Guid? CurrentMemberId,
-    Guid AdminMemberId
+    Guid? AdminMemberId
 );
 
 public record LocationResponse(Guid Id, string Name, string Address);

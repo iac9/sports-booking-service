@@ -148,7 +148,7 @@ namespace SportsBookingService.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("AdminMemberId")
+                    b.Property<Guid?>("AdminMemberId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Code")
@@ -353,8 +353,7 @@ namespace SportsBookingService.Api.Migrations
                     b.HasOne("SportsBookingService.Api.Models.Member", "AdminMember")
                         .WithMany()
                         .HasForeignKey("AdminMemberId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("AdminMember");
                 });

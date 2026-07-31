@@ -24,15 +24,6 @@ namespace SportsBookingService.Api.Migrations
                 );
                 """);
 
-            migrationBuilder.AlterColumn<Guid>(
-                name: "AdminMemberId",
-                table: "Groups",
-                type: "uuid",
-                nullable: false,
-                oldClrType: typeof(Guid?),
-                oldType: "uuid",
-                oldNullable: true);
-
             migrationBuilder.CreateIndex(
                 name: "IX_Groups_AdminMemberId",
                 table: "Groups",
