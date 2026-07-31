@@ -92,11 +92,8 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpDelete("{id:guid}/members/me")]
     public async Task<IActionResult> LeaveGroup(Guid id)
     {
-        var member = await currentMemberService.FindMemberAsync(id);
-        if (member is null) return NotFound();
-
-        db.Members.Remove(member);
-        await db.SaveChangesAsync();
+        var clerkUserId = currentMemberService.GetClerkUserId();
+        await db.Members.Where(m => m.GroupId == id && m.ClerkUserId == clerkUserId).ExecuteDeleteAsync();
         return NoContent();
     }
 
