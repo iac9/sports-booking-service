@@ -2,6 +2,7 @@ namespace SportsBookingService.Api.DTOs;
 
 public record CreateGroupRequest(string Name, string CreatorName);
 public record RenameGroupRequest(string Name);
+public record TransferAdminRequest(Guid MemberId);
 public record JoinGroupRequest(string Name);
 public record JoinGroupByCodeRequest(string Code, string MemberName);
 public record SetPrimaryLocationRequest(Guid? LocationId);

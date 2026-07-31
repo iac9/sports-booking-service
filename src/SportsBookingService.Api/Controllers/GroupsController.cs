@@ -56,6 +56,23 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         return Ok(await eventMapper.MapGroupAsync(group));
     }
 
+    [HttpPut("{id:guid}/admin")]
+    public async Task<ActionResult<GroupResponse>> TransferAdmin(Guid id, TransferAdminRequest request)
+    {
+        var group = await EventMapper.IncludeGroupFullGraph(db.Groups).FirstOrDefaultAsync(g => g.Id == id);
+        if (group is null) return NotFound();
+
+        var member = await currentMemberService.FindMemberAsync(id);
+        if (member is null || group.AdminMemberId != member.Id) return Forbid();
+
+        if (!group.Members.Any(m => m.Id == request.MemberId))
+            return BadRequest("Target member is not in this group.");
+
+        group.AdminMemberId = request.MemberId;
+        await db.SaveChangesAsync();
+        return Ok(await eventMapper.MapGroupAsync(group));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -102,8 +119,18 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         var member = await currentMemberService.FindMemberAsync(id);
         if (member is null) return NotFound();
 
-        var adminMemberId = await db.Groups.Where(g => g.Id == id).Select(g => (Guid?)g.AdminMemberId).FirstOrDefaultAsync();
-        if (adminMemberId == member.Id) return Conflict("Group admin cannot leave the group. Delete the group instead.");
+        var group = await db.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
+        if (group is null) return NotFound();
+
+        if (group.AdminMemberId == member.Id)
+        {
+            if (group.Members.Count > 1)
+                return Conflict("Group admin must transfer the admin role to another member before leaving.");
+
+            db.Groups.Remove(group);
+            await db.SaveChangesAsync();
+            return NoContent();
+        }
 
         await db.Members.Where(m => m.Id == member.Id).ExecuteDeleteAsync();
         return NoContent();
