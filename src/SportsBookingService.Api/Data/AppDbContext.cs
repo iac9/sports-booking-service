@@ -39,6 +39,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Group>()
+            .HasOne(g => g.AdminMember)
+            .WithMany()
+            .HasForeignKey(g => g.AdminMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Group>()
             .HasIndex(g => g.Code)
             .IsUnique();
 

@@ -68,7 +68,8 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             group.Events.OrderBy(e => e.Date).Select(MapDetail).ToList(),
             group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
             group.PrimaryLocationId,
-            currentMember?.Id
+            currentMember?.Id,
+            group.AdminMemberId
         );
     }
 

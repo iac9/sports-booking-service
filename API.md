@@ -39,11 +39,11 @@ shape changes, update this file in the same change.
 |---|---|---|---|
 | `GET /api/groups/code/{code}` | Look up a group by its 6-character join code (case-insensitive). | — | `200` → `GroupResponse` · `404` if no group has that code |
 | `POST /api/groups` | Create a new group. The creator (the caller) becomes its first member. | `Name` string<br>`CreatorName` string | `201 Created` → `GroupResponse` |
-| `PATCH /api/groups/{id}` | Rename a group. | `{ Name: string }` | `200` → `GroupResponse` · `404` if group not found |
-| `DELETE /api/groups/{id}` | Delete a group. | — | `204` · `404` if group not found |
+| `PATCH /api/groups/{id}` | Rename a group. Admin-only. | `{ Name: string }` | `200` → `GroupResponse` · `404` if group not found · `403` if caller isn't the group's admin |
+| `DELETE /api/groups/{id}` | Delete a group. Admin-only. | — | `204` · `404` if group not found · `403` if caller isn't the group's admin |
 | `GET /api/groups/{id}/members` | List a group's members. | — | `200` → `MemberResponse[]` |
 | `POST /api/groups/{id}/members` | Add the caller as a member directly to a group by id (prefer `POST /api/groups/join` for code-based joins). | `Name` string | `201 Created` → `MemberResponse` · `404` if group not found |
-| `DELETE /api/groups/{id}/members/me` | Remove the caller from a group (leave-group). | — | `204` · `404` if caller isn't a member of the group |
+| `DELETE /api/groups/{id}/members/me` | Remove the caller from a group (leave-group). | — | `204` · `404` if caller isn't a member of the group · `409` if the caller is the group's admin (must delete the group instead) |
 | `POST /api/groups/join` | Join a group by its join code, as the caller. Idempotent — if the caller already belongs, no change is made. | `Code` string<br>`MemberName` string | `200` → `GroupResponse` if the code matched, or `null` if no group has that code (never 404 — a missing code is a normal outcome the client checks for) |
 | `PUT /api/groups/{id}/primary-location` | Set (or clear) the group's default/primary location. | `{ LocationId: guid \| null }` | `204` · `404` if group not found · `400` if `LocationId` is supplied but isn't one of the group's locations |
 
@@ -119,6 +119,7 @@ GroupResponse {
   Events: EventDetailResponse[],
   Locations: LocationResponse[],
   PrimaryLocationId: guid?,
-  CurrentMemberId: guid?  // the caller's own Member.Id in this group; null if not a member
+  CurrentMemberId: guid?,  // the caller's own Member.Id in this group; null if not a member
+  AdminMemberId: guid  // the Member.Id of the group's admin — the member who created it; only the admin may rename or delete the group
 }
 ```

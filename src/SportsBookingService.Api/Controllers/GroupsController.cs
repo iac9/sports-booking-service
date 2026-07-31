@@ -32,6 +32,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
 
         var creator = new Member { Id = Guid.NewGuid(), Name = request.CreatorName, GroupId = group.Id, ClerkUserId = currentMemberService.GetClerkUserId() };
         group.Members.Add(creator);
+        group.AdminMemberId = creator.Id;
 
         db.Groups.Add(group);
         await db.SaveChangesAsync();
@@ -47,6 +48,9 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
 
         if (group is null) return NotFound();
 
+        var member = await currentMemberService.FindMemberAsync(id);
+        if (member is null || group.AdminMemberId != member.Id) return Forbid();
+
         group.Name = request.Name;
         await db.SaveChangesAsync();
         return Ok(await eventMapper.MapGroupAsync(group));
@@ -57,6 +61,9 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
     {
         var group = await db.Groups.FindAsync(id);
         if (group is null) return NotFound();
+
+        var member = await currentMemberService.FindMemberAsync(id);
+        if (member is null || group.AdminMemberId != member.Id) return Forbid();
 
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
@@ -92,8 +99,13 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpDelete("{id:guid}/members/me")]
     public async Task<IActionResult> LeaveGroup(Guid id)
     {
-        var clerkUserId = currentMemberService.GetClerkUserId();
-        await db.Members.Where(m => m.GroupId == id && m.ClerkUserId == clerkUserId).ExecuteDeleteAsync();
+        var member = await currentMemberService.FindMemberAsync(id);
+        if (member is null) return NotFound();
+
+        var adminMemberId = await db.Groups.Where(g => g.Id == id).Select(g => (Guid?)g.AdminMemberId).FirstOrDefaultAsync();
+        if (adminMemberId == member.Id) return Conflict("Group admin cannot leave the group. Delete the group instead.");
+
+        await db.Members.Where(m => m.Id == member.Id).ExecuteDeleteAsync();
         return NoContent();
     }
 

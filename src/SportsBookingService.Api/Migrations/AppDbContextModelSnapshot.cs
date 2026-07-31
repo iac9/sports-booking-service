@@ -145,6 +145,9 @@ namespace SportsBookingService.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("AdminMemberId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("text");
@@ -157,6 +160,8 @@ namespace SportsBookingService.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AdminMemberId");
 
                     b.HasIndex("Code")
                         .IsUnique();
@@ -338,6 +343,17 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("PaidBy");
+                });
+
+            modelBuilder.Entity("SportsBookingService.Api.Models.Group", b =>
+                {
+                    b.HasOne("SportsBookingService.Api.Models.Member", "AdminMember")
+                        .WithMany()
+                        .HasForeignKey("AdminMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AdminMember");
                 });
 
             modelBuilder.Entity("SportsBookingService.Api.Models.Location", b =>
