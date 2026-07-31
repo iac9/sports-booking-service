@@ -103,19 +103,29 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost("join")]
     public async Task<ActionResult<GroupResponse?>> JoinByCode(JoinGroupByCodeRequest request)
     {
-        var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
-            .FirstOrDefaultAsync(g => g.Code == request.Code.Trim().ToUpperInvariant());
+        var groupId = await db.Groups
+            .Where(g => g.Code == request.Code.Trim().ToUpperInvariant())
+            .Select(g => (Guid?)g.Id)
+            .FirstOrDefaultAsync();
 
-        if (group is null) return Ok((GroupResponse?)null);
+        if (groupId is null) return Ok((GroupResponse?)null);
 
         var clerkUserId = currentMemberService.GetClerkUserId();
-        if (!group.Members.Any(m => m.ClerkUserId == clerkUserId))
+        var alreadyMember = await db.Members.AnyAsync(m => m.GroupId == groupId && m.ClerkUserId == clerkUserId);
+        if (!alreadyMember)
         {
-            var member = new Member { Id = Guid.NewGuid(), Name = request.MemberName, GroupId = group.Id, ClerkUserId = clerkUserId };
-            group.Members.Add(member);
-            await db.SaveChangesAsync();
+            db.Members.Add(new Member { Id = Guid.NewGuid(), Name = request.MemberName, GroupId = groupId.Value, ClerkUserId = clerkUserId });
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // A concurrent request already added this member (unique index on GroupId+ClerkUserId) — treat as already joined.
+            }
         }
 
+        var group = await EventMapper.IncludeGroupFullGraph(db.Groups).FirstAsync(g => g.Id == groupId);
         return Ok(await eventMapper.MapGroupAsync(group));
     }
 
