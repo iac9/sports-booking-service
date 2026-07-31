@@ -51,7 +51,7 @@ tests/SportsBookingService.Api.Tests/
 
 ## Key Conventions
 
-- **Ids**: all resource ids are `Guid`. Member ids are client-supplied on creation (`POST /api/groups`, `POST /api/groups/{id}/members`, `POST /api/groups/join`) — never generate them server-side.
+- **Ids**: all resource ids are `Guid`, server-generated.
 - **JSON casing**: `camelCase` on the wire (ASP.NET Core default); model/DTO properties are PascalCase in C#.
 - **Dates**: `Date` fields are `DateOnly` (`yyyy-MM-dd` strings on the wire). `CreatedAt` is round-trip ISO 8601. `StartTime`/`EndTime` on court bookings are free-form client-owned strings, not `DateTime`.
 - **Status codes**: `404` when a parent resource doesn't exist, `400` for invalid references (e.g. a member not in the group), `409` for conflicting state (double-vote, double-join). `POST /api/groups/join` is the one exception — a missing code returns `200` with `null`, not `404`, since it's a normal outcome the UI checks for.

@@ -99,20 +99,6 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         return Ok(members);
     }
 
-    [HttpPost("{id:guid}/members")]
-    public async Task<ActionResult<MemberResponse>> JoinGroup(Guid id, JoinGroupRequest request)
-    {
-        var groupExists = await db.Groups.AnyAsync(g => g.Id == id);
-        if (!groupExists) return NotFound();
-
-        var member = new Member { Id = Guid.NewGuid(), Name = request.Name, GroupId = id, ClerkUserId = currentMemberService.GetClerkUserId() };
-        db.Members.Add(member);
-        await db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetMembers), new { id },
-            new MemberResponse(member.Id, member.Name));
-    }
-
     [HttpDelete("{id:guid}/members/me")]
     public async Task<IActionResult> LeaveGroup(Guid id)
     {
