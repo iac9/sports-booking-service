@@ -57,15 +57,32 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
         costService.Calculate(ev.Attendees, ev.Expenses)
     );
 
-    public async Task<GroupResponse> MapGroupAsync(Group group)
+    public Task<GroupResponse> MapGroupAsync(Group group)
     {
-        var currentMember = await currentMemberService.FindMemberAsync(group.Id);
-        return new(
+        var clerkUserId = currentMemberService.GetClerkUserId();
+        var currentMember = group.Members.FirstOrDefault(m => m.ClerkUserId == clerkUserId);
+        return Task.FromResult(new GroupResponse(
             group.Id,
             group.Name,
             group.Code,
             group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
             group.Events.OrderBy(e => e.Date).Select(MapDetail).ToList(),
+            group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
+            group.PrimaryLocationId,
+            currentMember?.Id,
+            group.AdminMemberId
+        ));
+    }
+
+    public GroupResponse MapGroupSummary(Group group, string clerkUserId)
+    {
+        var currentMember = group.Members.FirstOrDefault(m => m.ClerkUserId == clerkUserId);
+        return new(
+            group.Id,
+            group.Name,
+            group.Code,
+            group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
+            [],
             group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
             group.PrimaryLocationId,
             currentMember?.Id,

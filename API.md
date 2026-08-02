@@ -31,13 +31,13 @@ shape changes, update this file in the same change.
 
 | Endpoint | Description | Response |
 |---|---|---|
-| `GET /api/users/me/groups` | Returns every group the caller (resolved from the token's `sub` claim) belongs to. | `200` → `GroupResponse[]` (see [Group shape](#group-shape)) |
+| `GET /api/users/me/groups` | Returns every group the caller (resolved from the token's `sub` claim) belongs to, as lightweight summaries — `Members` and `Locations` are populated but `Events` is always `[]`. Use `GET /api/groups/code/{code}` to fetch full detail (including events) for a specific group. | `200` → `GroupResponse[]` (see [Group shape](#group-shape)) |
 
 ## Groups
 
 | Endpoint | Description | Request Body | Response |
 |---|---|---|---|
-| `GET /api/groups/code/{code}` | Look up a group by its 6-character join code (case-insensitive). | — | `200` → `GroupResponse` · `404` if no group has that code |
+| `GET /api/groups/code/{code}` | Look up a group by its 6-character join code (case-insensitive), with the full event graph populated. This is the endpoint the frontend uses to lazy-load full group detail after `GET /api/users/me/groups` returned only a summary. | — | `200` → `GroupResponse` · `404` if no group has that code |
 | `POST /api/groups` | Create a new group. The creator (the caller) becomes its first member. | `Name` string<br>`CreatorName` string | `201 Created` → `GroupResponse` |
 | `PATCH /api/groups/{id}` | Rename a group. Admin-only. | `{ Name: string }` | `200` → `GroupResponse` · `404` if group not found · `403` if caller isn't the group's admin |
 | `DELETE /api/groups/{id}` | Delete a group. Admin-only. | — | `204` · `404` if group not found · `403` if caller isn't the group's admin |

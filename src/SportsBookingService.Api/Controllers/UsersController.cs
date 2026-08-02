@@ -14,14 +14,12 @@ public class UsersController(AppDbContext db, EventMapper eventMapper, CurrentMe
     public async Task<ActionResult<List<GroupResponse>>> GetGroups()
     {
         var clerkUserId = currentMemberService.GetClerkUserId();
-        var groups = await EventMapper.IncludeGroupFullGraph(db.Groups)
+        var groups = await db.Groups
+            .Include(g => g.Members)
+            .Include(g => g.Locations)
             .Where(g => g.Members.Any(m => m.ClerkUserId == clerkUserId))
             .ToListAsync();
 
-        var results = new List<GroupResponse>();
-        foreach (var group in groups)
-            results.Add(await eventMapper.MapGroupAsync(group));
-
-        return Ok(results);
+        return Ok(groups.Select(g => eventMapper.MapGroupSummary(g, clerkUserId)).ToList());
     }
 }
