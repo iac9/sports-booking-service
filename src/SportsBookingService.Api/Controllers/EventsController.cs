@@ -57,9 +57,11 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
             Title = request.Title,
             Date = DateOnly.Parse(request.Date),
             LocationId = request.LocationId,
+            Location = request.LocationId is not null ? await db.Locations.FindAsync(request.LocationId) : null,
             MaxAttendees = request.MaxAttendees,
             GroupId = groupId,
             CreatedByMemberId = member.Id,
+            CreatedBy = member,
             Status = status,
         };
 
@@ -75,15 +77,14 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
                 break;
             }
             case EventStatus.Confirmed:
-                ev.Attendees.Add(new Attendee { EventId = ev.Id, MemberId = member.Id, JoinedAt = DateTime.UtcNow });
+                ev.Attendees.Add(new Attendee { EventId = ev.Id, MemberId = member.Id, Member = member, JoinedAt = DateTime.UtcNow });
                 break;
         }
 
         db.Events.Add(ev);
         await db.SaveChangesAsync();
 
-        var created = await eventMapper.LoadEvent(groupId, ev.Id);
-        return CreatedAtAction(nameof(Get), new { groupId, id = ev.Id }, eventMapper.MapDetail(created!));
+        return CreatedAtAction(nameof(Get), new { groupId, id = ev.Id }, eventMapper.MapDetail(ev));
     }
 
     [HttpPatch("{id:guid}")]
