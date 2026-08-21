@@ -70,9 +70,18 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         if (request.CourtBookings is not null)
         {
-            db.CourtBookings.RemoveRange(ev.CourtBookings);
+            foreach (var cb in ev.CourtBookings.ToList())
+            {
+                ev.CourtBookings.Remove(cb);
+                db.CourtBookings.Remove(cb);
+            }
+
             foreach (var cb in request.CourtBookings)
-                ev.CourtBookings.Add(new CourtBooking { Id = Guid.NewGuid(), Court = cb.Court, StartTime = cb.StartTime, EndTime = cb.EndTime, EventId = ev.Id });
+            {
+                var newBooking = new CourtBooking { Id = Guid.NewGuid(), Court = cb.Court, StartTime = cb.StartTime, EndTime = cb.EndTime, EventId = ev.Id };
+                db.CourtBookings.Add(newBooking);
+                ev.CourtBookings.Add(newBooking);
+            }
         }
 
         if (request.LocationOptions is not null)
@@ -81,11 +90,16 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
                 lo => lo.LocationName,
                 lo => lo.Votes.Select(v => v.MemberId).ToList());
 
-            db.LocationOptions.RemoveRange(ev.LocationOptions);
+            foreach (var lo in ev.LocationOptions.ToList())
+            {
+                ev.LocationOptions.Remove(lo);
+                db.LocationOptions.Remove(lo);
+            }
 
             foreach (var lo in request.LocationOptions)
             {
                 var newOption = new LocationOption { Id = lo.Id ?? Guid.NewGuid(), LocationName = lo.LocationName, EventId = ev.Id };
+                db.LocationOptions.Add(newOption);
                 if (existingVotes.TryGetValue(lo.LocationName, out var voters))
                     foreach (var voterId in voters)
                         newOption.Votes.Add(new LocationVote { LocationOptionId = newOption.Id, MemberId = voterId });
@@ -126,9 +140,17 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
             return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.Conflict, "Already joined or waitlisted.");
 
         if (ev.Attendees.Count < ev.MaxAttendees)
-            ev.Attendees.Add(new Attendee { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow });
+        {
+            var attendee = new Attendee { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow };
+            db.Attendees.Add(attendee);
+            ev.Attendees.Add(attendee);
+        }
         else
-            ev.Waitlist.Add(new WaitlistEntry { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow });
+        {
+            var waitlistEntry = new WaitlistEntry { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow };
+            db.WaitlistEntries.Add(waitlistEntry);
+            ev.Waitlist.Add(waitlistEntry);
+        }
 
         await db.SaveChangesAsync();
         return ServiceResult<EventDetailResponse>.Success(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
@@ -154,7 +176,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
             if (first is not null)
             {
                 ev.Waitlist.Remove(first);
-                ev.Attendees.Add(new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow });
+                var promoted = new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow };
+                db.Attendees.Add(promoted);
+                ev.Attendees.Add(promoted);
             }
         }
         else
@@ -258,7 +282,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         if (option.Votes.Any(v => v.MemberId == member.Id))
             return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.Conflict, "Already voted.");
 
-        option.Votes.Add(new LocationVote { LocationOptionId = optionId, MemberId = member.Id });
+        var vote = new LocationVote { LocationOptionId = optionId, MemberId = member.Id };
+        db.LocationVotes.Add(vote);
+        option.Votes.Add(vote);
         await db.SaveChangesAsync();
         return ServiceResult<EventDetailResponse>.Success(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
