@@ -87,6 +87,12 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         // Deleting Events explicitly first clears Expenses before Members are cascaded away.
         await db.Events.Where(e => e.GroupId == id).ExecuteDeleteAsync();
 
+        // Loading the admin Member above makes EF track it alongside the Group, and it fixes up
+        // group.Members to include it. Group.AdminMemberId -> Member and Member.GroupId -> Group
+        // then form a cycle EF can't order for deletion, so break it before removing the group.
+        group.AdminMemberId = null;
+        await db.SaveChangesAsync();
+
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
         return NoContent();
@@ -119,6 +125,9 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
                 return Conflict("Group admin must transfer the admin role to another member before leaving.");
 
             await db.Events.Where(e => e.GroupId == id).ExecuteDeleteAsync();
+
+            group.AdminMemberId = null;
+            await db.SaveChangesAsync();
 
             db.Groups.Remove(group);
             await db.SaveChangesAsync();
