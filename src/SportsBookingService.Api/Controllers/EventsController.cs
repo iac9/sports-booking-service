@@ -9,7 +9,7 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups/{groupId:guid}/events")]
-public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentMemberService currentMemberService) : ControllerBase
+public class EventsController(AppDbContext db, EventMapper eventMapper, EventService eventService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<EventSummaryResponse>>> List(Guid groupId, [FromQuery] string? status)
@@ -45,101 +45,23 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost]
     public async Task<ActionResult<EventDetailResponse>> Create(Guid groupId, CreateEventRequest request)
     {
-        if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return NotFound();
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-
-        var status = request.Status.ToLowerInvariant() == "draft" ? EventStatus.Draft : EventStatus.Confirmed;
-
-        var ev = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = request.Title,
-            Date = DateOnly.Parse(request.Date),
-            LocationId = request.LocationId,
-            Location = request.LocationId is not null ? await db.Locations.FindAsync(request.LocationId) : null,
-            MaxAttendees = request.MaxAttendees,
-            GroupId = groupId,
-            CreatedByMemberId = member.Id,
-            CreatedBy = member,
-            Status = status,
-        };
-
-        foreach (var cb in request.CourtBookings)
-            ev.CourtBookings.Add(new CourtBooking { Id = Guid.NewGuid(), Court = cb.Court, StartTime = cb.StartTime, EndTime = cb.EndTime, EventId = ev.Id });
-
-        switch (status)
-        {
-            case EventStatus.Draft when request.LocationOptions is not null:
-            {
-                foreach (var lo in request.LocationOptions)
-                    ev.LocationOptions.Add(new LocationOption { Id = Guid.NewGuid(), LocationName = lo.LocationName, EventId = ev.Id });
-                break;
-            }
-            case EventStatus.Confirmed:
-                ev.Attendees.Add(new Attendee { EventId = ev.Id, MemberId = member.Id, Member = member, JoinedAt = DateTime.UtcNow });
-                break;
-        }
-
-        db.Events.Add(ev);
-        await db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(Get), new { groupId, id = ev.Id }, eventMapper.MapDetail(ev));
+        var result = await eventService.CreateAsync(groupId, request);
+        if (!result.IsSuccess) return this.ToActionResult(result.Error!);
+        return CreatedAtAction(nameof(Get), new { groupId, id = result.Value!.Id }, result.Value);
     }
 
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<EventDetailResponse>> Update(Guid groupId, Guid id, UpdateEventRequest request)
     {
-        var ev = await db.Events
-            .Include(e => e.CourtBookings)
-            .Include(e => e.LocationOptions).ThenInclude(lo => lo.Votes)
-            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-
-        if (ev is null) return NotFound();
-
-        if (request.Title is not null) ev.Title = request.Title;
-        if (request.Date is not null) ev.Date = DateOnly.Parse(request.Date);
-        if (request.LocationId is not null) ev.LocationId = request.LocationId;
-        if (request.MaxAttendees is not null) ev.MaxAttendees = request.MaxAttendees.Value;
-
-        if (request.CourtBookings is not null)
-        {
-            db.CourtBookings.RemoveRange(ev.CourtBookings);
-            foreach (var cb in request.CourtBookings)
-                ev.CourtBookings.Add(new CourtBooking { Id = Guid.NewGuid(), Court = cb.Court, StartTime = cb.StartTime, EndTime = cb.EndTime, EventId = ev.Id });
-        }
-
-        if (request.LocationOptions is not null)
-        {
-            var existingVotes = ev.LocationOptions.ToDictionary(
-                lo => lo.LocationName,
-                lo => lo.Votes.Select(v => v.MemberId).ToList());
-
-            db.LocationOptions.RemoveRange(ev.LocationOptions);
-
-            foreach (var lo in request.LocationOptions)
-            {
-                var newOption = new LocationOption { Id = lo.Id ?? Guid.NewGuid(), LocationName = lo.LocationName, EventId = ev.Id };
-                if (existingVotes.TryGetValue(lo.LocationName, out var voters))
-                    foreach (var voterId in voters)
-                        newOption.Votes.Add(new LocationVote { LocationOptionId = newOption.Id, MemberId = voterId });
-                ev.LocationOptions.Add(newOption);
-            }
-        }
-
-        await db.SaveChangesAsync();
-        var updated = await eventMapper.LoadEvent(groupId, id);
-        return Ok(eventMapper.MapDetail(updated!));
+        var result = await eventService.UpdateAsync(groupId, id, request);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid groupId, Guid id)
     {
-        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-        if (ev is null) return NotFound();
-        db.Events.Remove(ev);
-        await db.SaveChangesAsync();
-        return NoContent();
+        var result = await eventService.DeleteAsync(groupId, id);
+        return result.IsSuccess ? NoContent() : this.ToActionResult(result.Error!);
     }
 
     // ── RSVP ────────────────────────────────────────────────────────────────────
@@ -147,57 +69,15 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost("{id:guid}/rsvp")]
     public async Task<ActionResult<EventDetailResponse>> Rsvp(Guid groupId, Guid id)
     {
-        var ev = await db.Events
-            .Include(e => e.Attendees)
-            .Include(e => e.Waitlist)
-            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-
-        if (ev is null) return NotFound();
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-        if (ev.Attendees.Any(a => a.MemberId == member.Id) || ev.Waitlist.Any(w => w.MemberId == member.Id))
-            return Conflict("Already joined or waitlisted.");
-
-        if (ev.Attendees.Count < ev.MaxAttendees)
-            ev.Attendees.Add(new Attendee { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow });
-        else
-            ev.Waitlist.Add(new WaitlistEntry { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow });
-
-        await db.SaveChangesAsync();
-        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+        var result = await eventService.RsvpAsync(groupId, id);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
     [HttpDelete("{id:guid}/rsvp/me")]
     public async Task<ActionResult<EventDetailResponse>> Leave(Guid groupId, Guid id)
     {
-        var ev = await db.Events
-            .Include(e => e.Attendees)
-            .Include(e => e.Waitlist)
-            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-
-        if (ev is null) return NotFound();
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-
-        var attendee = ev.Attendees.FirstOrDefault(a => a.MemberId == member.Id);
-        if (attendee is not null)
-        {
-            ev.Attendees.Remove(attendee);
-            var first = ev.Waitlist.OrderBy(w => w.JoinedAt).FirstOrDefault();
-            if (first is not null)
-            {
-                ev.Waitlist.Remove(first);
-                ev.Attendees.Add(new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow });
-            }
-        }
-        else
-        {
-            var waitlisted = ev.Waitlist.FirstOrDefault(w => w.MemberId == member.Id);
-            if (waitlisted is not null) ev.Waitlist.Remove(waitlisted);
-        }
-
-        await db.SaveChangesAsync();
-        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+        var result = await eventService.LeaveAsync(groupId, id);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
     // ── Expenses ─────────────────────────────────────────────────────────────────
@@ -205,28 +85,9 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost("{id:guid}/expenses")]
     public async Task<ActionResult<ExpenseResponse>> AddExpense(Guid groupId, Guid id, AddExpenseRequest request)
     {
-        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-        if (ev is null) return NotFound();
-
-        var paidBy = await db.Members.FirstOrDefaultAsync(m => m.Id == request.PaidByMemberId && m.GroupId == groupId);
-        if (paidBy is null) return BadRequest("Member not found in group.");
-
-        var expense = new Expense
-        {
-            Id = Guid.NewGuid(),
-            Description = request.Description,
-            Amount = request.Amount,
-            PaidByMemberId = request.PaidByMemberId,
-            CreatedAt = DateTime.UtcNow,
-            EventId = id,
-        };
-        db.Expenses.Add(expense);
-        await db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(Get), new { groupId, id },
-            new ExpenseResponse(expense.Id, expense.Description, expense.Amount,
-                new MemberResponse(paidBy.Id, paidBy.Name),
-                expense.CreatedAt.ToString("o")));
+        var result = await eventService.AddExpenseAsync(groupId, id, request);
+        if (!result.IsSuccess) return this.ToActionResult(result.Error!);
+        return CreatedAtAction(nameof(Get), new { groupId, id }, result.Value);
     }
 
     // ── Confirm draft ─────────────────────────────────────────────────────────────
@@ -234,45 +95,8 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<EventDetailResponse>> Confirm(Guid groupId, Guid id)
     {
-        var ev = await db.Events
-            .Include(e => e.LocationOptions).ThenInclude(lo => lo.Votes)
-            .Include(e => e.Attendees)
-            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId && e.Status == EventStatus.Draft);
-
-        if (ev is null) return NotFound();
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-
-        var winner = ev.LocationOptions
-            .OrderByDescending(lo => lo.Votes.Count)
-            .FirstOrDefault();
-
-        ev.Status = EventStatus.Confirmed;
-        ev.LocationId = ev.LocationOptions
-            .Where(lo => lo.LocationName == winner?.LocationName)
-            .Select(lo => (Guid?)lo.Id)
-            .FirstOrDefault();
-
-        var voterIds = ev.LocationOptions.SelectMany(lo => lo.Votes.Select(v => v.MemberId)).Distinct();
-        var allMemberIds = ev.Attendees.Select(a => a.MemberId)
-            .Union(voterIds)
-            .Append(member.Id)
-            .Distinct();
-
-        db.Attendees.RemoveRange(ev.Attendees);
-        foreach (var mid in allMemberIds)
-            db.Attendees.Add(new Attendee { EventId = id, MemberId = mid, JoinedAt = DateTime.UtcNow });
-
-        db.LocationOptions.RemoveRange(ev.LocationOptions);
-
-        if (winner is not null)
-        {
-            var loc = await db.Locations.FirstOrDefaultAsync(l => l.Name == winner.LocationName && l.GroupId == groupId);
-            ev.LocationId = loc?.Id;
-        }
-
-        await db.SaveChangesAsync();
-        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+        var result = await eventService.ConfirmAsync(groupId, id);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
     // ── Location option votes ─────────────────────────────────────────────────────
@@ -280,32 +104,14 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, CurrentM
     [HttpPost("{id:guid}/location-options/{optionId:guid}/votes")]
     public async Task<ActionResult<EventDetailResponse>> Vote(Guid groupId, Guid id, Guid optionId)
     {
-        var option = await db.LocationOptions
-            .Include(lo => lo.Votes)
-            .FirstOrDefaultAsync(lo => lo.Id == optionId && lo.EventId == id);
-
-        if (option is null) return NotFound();
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-        if (option.Votes.Any(v => v.MemberId == member.Id)) return Conflict("Already voted.");
-
-        option.Votes.Add(new LocationVote { LocationOptionId = optionId, MemberId = member.Id });
-        await db.SaveChangesAsync();
-        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+        var result = await eventService.VoteAsync(groupId, id, optionId);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
     [HttpDelete("{id:guid}/location-options/{optionId:guid}/votes/me")]
     public async Task<ActionResult<EventDetailResponse>> Unvote(Guid groupId, Guid id, Guid optionId)
     {
-        var member = await currentMemberService.FindMemberAsync(groupId);
-        if (member is null) return BadRequest("Member not found in group.");
-
-        var vote = await db.LocationVotes
-            .FirstOrDefaultAsync(v => v.LocationOptionId == optionId && v.MemberId == member.Id);
-
-        if (vote is null) return NotFound();
-        db.LocationVotes.Remove(vote);
-        await db.SaveChangesAsync();
-        return Ok(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+        var result = await eventService.UnvoteAsync(groupId, id, optionId);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 }

@@ -69,6 +69,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<CostService>();
 builder.Services.AddScoped<EventMapper>();
 builder.Services.AddScoped<CurrentMemberService>();
+builder.Services.AddScoped<GroupService>();
+builder.Services.AddScoped<EventService>();
 
 var app = builder.Build();
 
