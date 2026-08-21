@@ -82,6 +82,11 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         var member = await currentMemberService.FindMemberAsync(id);
         if (member is null || group.AdminMemberId != member.Id) return Forbid();
 
+        // Expenses reference Members with ON DELETE RESTRICT, and Postgres resolves the
+        // Group's cascades (Members, Events) before the Events -> Expenses cascade runs.
+        // Deleting Events explicitly first clears Expenses before Members are cascaded away.
+        await db.Events.Where(e => e.GroupId == id).ExecuteDeleteAsync();
+
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
         return NoContent();
@@ -112,6 +117,8 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, CurrentM
         {
             if (group.Members.Count > 1)
                 return Conflict("Group admin must transfer the admin role to another member before leaving.");
+
+            await db.Events.Where(e => e.GroupId == id).ExecuteDeleteAsync();
 
             db.Groups.Remove(group);
             await db.SaveChangesAsync();
