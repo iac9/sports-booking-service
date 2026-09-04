@@ -111,6 +111,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers().RequireAuthorization();
 app.MapGet("/health", () => Results.Ok());
+app.MapGet("/health/db", async (AppDbContext db) => await db.Database.CanConnectAsync() ? Results.Ok() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 
 app.Run();
 

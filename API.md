@@ -6,7 +6,7 @@ shape changes, update this file in the same change.
 
 ## Conventions
 
-- **Auth**: every endpoint except `GET /health` requires `Authorization: Bearer <token>`,
+- **Auth**: every endpoint except `GET /health` and `GET /health/db` requires `Authorization: Bearer <token>`,
   where `<token>` is a Clerk session JWT. The token is verified server-side against Clerk's
   JWKS (`{Clerk:FrontendApiUrl}/.well-known/jwks.json`); requests with a missing or invalid
   token get `401`. The token's `sub` claim is the caller's durable Clerk user id, stored on
@@ -80,7 +80,8 @@ Base path: `/api/groups/{groupId}/events`
 
 | Endpoint | Description | Response |
 |---|---|---|
-| `GET /health` | Liveness check. The only endpoint that doesn't require auth. | `200 OK` (no body) |
+| `GET /health` | Liveness check. Doesn't touch the database. | `200 OK` (no body) |
+| `GET /health/db` | Readiness check — verifies the database connection is reachable. | `200 OK` if reachable, `503 Service Unavailable` otherwise (no body) |
 
 ## Response shapes
 
