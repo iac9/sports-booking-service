@@ -25,8 +25,6 @@ public record LocationResponse(Guid Id, string Name, string Address);
 
 public record CourtBookingResponse(Guid Id, string Court, string StartTime, string EndTime);
 
-public record LocationOptionResponse(Guid Id, string LocationName, List<MemberResponse> Votes);
-
 public record ExpenseResponse(
     Guid Id,
     string Description,
@@ -47,7 +45,6 @@ public record EventSummaryResponse(
     Guid Id,
     string Title,
     string Date,
-    string Status,
     int AttendeeCount,
     int MaxAttendees,
     string? LocationName
@@ -65,7 +62,5 @@ public record EventDetailResponse(
     List<MemberResponse> Waitlist,
     List<ExpenseResponse> Expenses,
     MemberResponse CreatedBy,
-    string Status,
-    List<LocationOptionResponse>? LocationOptions,
     CostBreakdownResponse CostBreakdown
 );

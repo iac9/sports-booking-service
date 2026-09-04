@@ -18,7 +18,6 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             .Include(e => e.Attendees).ThenInclude(a => a.Member)
             .Include(e => e.Waitlist).ThenInclude(w => w.Member)
             .Include(e => e.Expenses).ThenInclude(ex => ex.PaidBy)
-            .Include(e => e.LocationOptions).ThenInclude(lo => lo.Votes).ThenInclude(v => v.Member)
             .Include(e => e.CreatedBy);
 
     public static IQueryable<Group> IncludeGroupFullGraph(IQueryable<Group> query) =>
@@ -30,7 +29,6 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             .Include(g => g.Events).ThenInclude(e => e.Attendees).ThenInclude(a => a.Member)
             .Include(g => g.Events).ThenInclude(e => e.Waitlist).ThenInclude(w => w.Member)
             .Include(g => g.Events).ThenInclude(e => e.Expenses).ThenInclude(ex => ex.PaidBy)
-            .Include(g => g.Events).ThenInclude(e => e.LocationOptions).ThenInclude(lo => lo.Votes).ThenInclude(v => v.Member)
             .Include(g => g.Events).ThenInclude(e => e.CreatedBy);
 
     public EventDetailResponse MapDetail(Event ev) => new(
@@ -48,12 +46,6 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             new MemberResponse(e.PaidBy.Id, e.PaidBy.Name),
             e.CreatedAt.ToString("o"))).ToList(),
         new MemberResponse(ev.CreatedBy.Id, ev.CreatedBy.Name),
-        StatusString(ev.Status),
-        ev.Status == EventStatus.Draft
-            ? ev.LocationOptions.Select(lo => new LocationOptionResponse(
-                lo.Id, lo.LocationName,
-                lo.Votes.Select(v => new MemberResponse(v.Member.Id, v.Member.Name)).ToList())).ToList()
-            : null,
         costService.Calculate(ev.Attendees, ev.Expenses)
     );
 
@@ -73,7 +65,4 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             group.AdminMemberId
         ));
     }
-
-    public static string StatusString(EventStatus status) =>
-        status == EventStatus.Draft ? "draft" : "confirmed";
 }

@@ -13,18 +13,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Attendee> Attendees => Set<Attendee>();
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<Expense> Expenses => Set<Expense>();
-    public DbSet<LocationOption> LocationOptions => Set<LocationOption>();
-    public DbSet<LocationVote> LocationVotes => Set<LocationVote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Attendee>().HasKey(a => new { a.EventId, a.MemberId });
         modelBuilder.Entity<WaitlistEntry>().HasKey(w => new { w.EventId, w.MemberId });
-        modelBuilder.Entity<LocationVote>().HasKey(v => new { v.LocationOptionId, v.MemberId });
-
-        modelBuilder.Entity<Event>()
-            .Property(e => e.Status)
-            .HasConversion<string>();
 
         modelBuilder.Entity<Event>()
             .HasOne(e => e.CreatedBy)

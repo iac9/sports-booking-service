@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
-using SportsBookingService.Api.Models;
 using SportsBookingService.Api.Services;
 
 namespace SportsBookingService.Api.Controllers;
@@ -12,26 +11,18 @@ namespace SportsBookingService.Api.Controllers;
 public class EventsController(AppDbContext db, EventMapper eventMapper, EventService eventService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<EventSummaryResponse>>> List(Guid groupId, [FromQuery] string? status)
+    public async Task<ActionResult<List<EventSummaryResponse>>> List(Guid groupId)
     {
-        var query = db.Events
+        var events = await db.Events
             .Include(e => e.Location)
-            .Where(e => e.GroupId == groupId);
-
-        if (status is not null)
-        {
-            var parsed = status.ToLowerInvariant() == "draft" ? EventStatus.Draft : EventStatus.Confirmed;
-            query = query.Where(e => e.Status == parsed);
-        }
-
-        var events = await query
+            .Where(e => e.GroupId == groupId)
             .Include(e => e.Attendees)
             .OrderBy(e => e.Date)
             .ToListAsync();
 
         return Ok(events.Select(e => new EventSummaryResponse(
             e.Id, e.Title, e.Date.ToString("yyyy-MM-dd"),
-            EventMapper.StatusString(e.Status), e.Attendees.Count, e.MaxAttendees,
+            e.Attendees.Count, e.MaxAttendees,
             e.Location?.Name)).ToList());
     }
 
@@ -88,30 +79,5 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, EventSer
         var result = await eventService.AddExpenseAsync(groupId, id, request);
         if (!result.IsSuccess) return this.ToActionResult(result.Error!);
         return CreatedAtAction(nameof(Get), new { groupId, id }, result.Value);
-    }
-
-    // ── Confirm draft ─────────────────────────────────────────────────────────────
-
-    [HttpPost("{id:guid}/confirm")]
-    public async Task<ActionResult<EventDetailResponse>> Confirm(Guid groupId, Guid id)
-    {
-        var result = await eventService.ConfirmAsync(groupId, id);
-        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
-    }
-
-    // ── Location option votes ─────────────────────────────────────────────────────
-
-    [HttpPost("{id:guid}/location-options/{optionId:guid}/votes")]
-    public async Task<ActionResult<EventDetailResponse>> Vote(Guid groupId, Guid id, Guid optionId)
-    {
-        var result = await eventService.VoteAsync(groupId, id, optionId);
-        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
-    }
-
-    [HttpDelete("{id:guid}/location-options/{optionId:guid}/votes/me")]
-    public async Task<ActionResult<EventDetailResponse>> Unvote(Guid groupId, Guid id, Guid optionId)
-    {
-        var result = await eventService.UnvoteAsync(groupId, id, optionId);
-        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 }

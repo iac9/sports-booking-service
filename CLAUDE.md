@@ -42,8 +42,7 @@ tests/SportsBookingService.Api.Tests/
 - **Group** — has a unique 6-char join `Code`, owns `Members`, `Locations`, `Events`, and an optional `PrimaryLocationId`.
 - **Member** — belongs to exactly one `Group`; the `Id` is client-supplied (not server-generated) so it matches the UI's `localStorage` identity.
 - **Location** — a saved venue belonging to a `Group`.
-- **Event** — belongs to a `Group`; has a `Status` of `Draft` or `Confirmed`, `CourtBookings`, `Attendees`, `Waitlist`, `Expenses`, and (when `Draft`) `LocationOptions`.
-- **LocationOption** / **LocationVote** — only relevant while an `Event` is `Draft`; members vote on proposed locations before confirming.
+- **Event** — belongs to a `Group`; has `CourtBookings`, `Attendees`, `Waitlist`, and `Expenses`.
 - **Attendee** / **WaitlistEntry** — join tables with a `JoinedAt` timestamp, used to order waitlist promotion and cost-balance display.
 - **Expense** — recorded against an `Event`, paid by one `Member`.
 
@@ -54,7 +53,7 @@ tests/SportsBookingService.Api.Tests/
 - **Ids**: all resource ids are `Guid`, server-generated.
 - **JSON casing**: `camelCase` on the wire (ASP.NET Core default); model/DTO properties are PascalCase in C#.
 - **Dates**: `Date` fields are `DateOnly` (`yyyy-MM-dd` strings on the wire). `CreatedAt` is round-trip ISO 8601. `StartTime`/`EndTime` on court bookings are free-form client-owned strings, not `DateTime`.
-- **Status codes**: `404` when a parent resource doesn't exist, `400` for invalid references (e.g. a member not in the group), `409` for conflicting state (double-vote, double-join). `POST /api/groups/join` is the one exception — a missing code returns `200` with `null`, not `404`, since it's a normal outcome the UI checks for.
+- **Status codes**: `404` when a parent resource doesn't exist, `400` for invalid references (e.g. a member not in the group), `409` for conflicting state (e.g. double-join). `POST /api/groups/join` is the one exception — a missing code returns `200` with `null`, not `404`, since it's a normal outcome the UI checks for.
 - **Nullable reference types** are enabled — no `#nullable disable` workarounds.
 - **Response mapping**: controllers never return EF entities directly — always map through `EventMapper` / DTO constructors in `Responses.cs`.
 
@@ -111,7 +110,7 @@ When an API contract changes (new endpoint, changed request/response shape, chan
 3. Update `README.md` if setup, tech stack, or run instructions changed.
 4. Add or update an EF Core migration if the model changed (`dotnet ef migrations add <Name> --project src/SportsBookingService.Api`).
 5. Run `dotnet test` — fix any failures before considering the task done.
-6. Add a test when new logic has non-trivial edge cases (e.g. cost splitting, waitlist promotion, vote tallying). Skip tests for straightforward CRUD that just delegates to EF Core.
+6. Add a test when new logic has non-trivial edge cases (e.g. cost splitting, waitlist promotion). Skip tests for straightforward CRUD that just delegates to EF Core.
 
 **Never:**
 - Generate a Member id server-side — it must always come from the client.

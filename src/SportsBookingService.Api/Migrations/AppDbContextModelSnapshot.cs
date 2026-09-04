@@ -89,10 +89,6 @@ namespace SportsBookingService.Api.Migrations
                     b.Property<int>("MaxAttendees")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -191,41 +187,6 @@ namespace SportsBookingService.Api.Migrations
                     b.HasIndex("GroupId");
 
                     b.ToTable("Locations");
-                });
-
-            modelBuilder.Entity("SportsBookingService.Api.Models.LocationOption", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LocationName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventId");
-
-                    b.ToTable("LocationOptions");
-                });
-
-            modelBuilder.Entity("SportsBookingService.Api.Models.LocationVote", b =>
-                {
-                    b.Property<Guid>("LocationOptionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("LocationOptionId", "MemberId");
-
-                    b.HasIndex("MemberId");
-
-                    b.ToTable("LocationVotes");
                 });
 
             modelBuilder.Entity("SportsBookingService.Api.Models.Member", b =>
@@ -366,36 +327,6 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Group");
                 });
 
-            modelBuilder.Entity("SportsBookingService.Api.Models.LocationOption", b =>
-                {
-                    b.HasOne("SportsBookingService.Api.Models.Event", "Event")
-                        .WithMany("LocationOptions")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Event");
-                });
-
-            modelBuilder.Entity("SportsBookingService.Api.Models.LocationVote", b =>
-                {
-                    b.HasOne("SportsBookingService.Api.Models.LocationOption", "LocationOption")
-                        .WithMany("Votes")
-                        .HasForeignKey("LocationOptionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SportsBookingService.Api.Models.Member", "Member")
-                        .WithMany()
-                        .HasForeignKey("MemberId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("LocationOption");
-
-                    b.Navigation("Member");
-                });
-
             modelBuilder.Entity("SportsBookingService.Api.Models.Member", b =>
                 {
                     b.HasOne("SportsBookingService.Api.Models.Group", "Group")
@@ -434,8 +365,6 @@ namespace SportsBookingService.Api.Migrations
 
                     b.Navigation("Expenses");
 
-                    b.Navigation("LocationOptions");
-
                     b.Navigation("Waitlist");
                 });
 
@@ -446,11 +375,6 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Locations");
 
                     b.Navigation("Members");
-                });
-
-            modelBuilder.Entity("SportsBookingService.Api.Models.LocationOption", b =>
-                {
-                    b.Navigation("Votes");
                 });
 #pragma warning restore 612, 618
         }

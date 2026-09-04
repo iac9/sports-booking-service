@@ -7,17 +7,13 @@ public record JoinGroupByCodeRequest(string Code, string MemberName);
 public record SetPrimaryLocationRequest(Guid? LocationId);
 
 public record CreateCourtBookingRequest(string Court, string StartTime, string EndTime);
-public record CreateLocationOptionRequest(string LocationName);
-public record UpdateLocationOptionRequest(Guid? Id, string LocationName);
 
 public record CreateEventRequest(
     string Title,
     string Date,
     Guid? LocationId,
     int MaxAttendees,
-    string Status,
-    List<CreateCourtBookingRequest> CourtBookings,
-    List<CreateLocationOptionRequest>? LocationOptions
+    List<CreateCourtBookingRequest> CourtBookings
 );
 
 public record UpdateEventRequest(
@@ -25,8 +21,7 @@ public record UpdateEventRequest(
     string? Date,
     Guid? LocationId,
     int? MaxAttendees,
-    List<CreateCourtBookingRequest>? CourtBookings,
-    List<UpdateLocationOptionRequest>? LocationOptions
+    List<CreateCourtBookingRequest>? CourtBookings
 );
 
 public record AddExpenseRequest(string Description, decimal Amount, Guid PaidByMemberId);

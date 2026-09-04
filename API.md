@@ -13,7 +13,7 @@ shape changes, update this file in the same change.
   `Members.ClerkUserId`. `Members.Id` is a server-generated `Guid` — a person gets a fresh
   `Member` row (and `Id`) per group they join, unified across groups only via `ClerkUserId`.
   Endpoints that used to accept a client-supplied id for "who is acting" (creating a group,
-  joining, leaving, RSVPing, confirming, voting) now resolve the acting member server-side
+  joining, leaving, RSVPing) now resolve the acting member server-side
   from the verified token instead. `AddExpense`'s `PaidByMemberId` is the exception — it names
   an arbitrary existing group member ("who paid"), not necessarily the caller, so it's still
   client-supplied.
@@ -64,17 +64,14 @@ Base path: `/api/groups/{groupId}/events`
 
 | Endpoint | Description | Request Body | Response |
 |---|---|---|---|
-| `GET /?status=draft\|confirmed` | List a group's events (optionally filtered by status), ordered by date. | — | `200` → `EventSummaryResponse[]` |
+| `GET /` | List a group's events, ordered by date. | — | `200` → `EventSummaryResponse[]` |
 | `GET /{id}` | Get a single event. | — | `200` → `EventDetailResponse` · `404` if event not found in group |
-| `POST /` | Create an event, as the caller. `Status` is `"draft"` (still choosing a location, voting open) or `"confirmed"` (location and attendees locked in). When `Confirmed`, the creator is auto-added as an attendee; when `Draft`, `LocationOptions` become votable options. | `Title` string<br>`Date` string (`yyyy-MM-dd`)<br>`LocationId` guid?<br>`MaxAttendees` int<br>`Status` `"draft"` \| `"confirmed"`<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]`<br>`LocationOptions` `{ LocationName: string }[]`? | `201 Created` → `EventDetailResponse` · `404` if group not found · `400` if the caller isn't a member of the group |
-| `PATCH /{id}` | Partially update an event. Only supplied fields are changed. Supplying `CourtBookings` or `LocationOptions` replaces the entire respective collection (existing votes on location options are preserved by matching on `LocationName`). | `Title` string?<br>`Date` string?<br>`LocationId` guid?<br>`MaxAttendees` int?<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]`?<br>`LocationOptions` `{ Id: guid?, LocationName: string }[]`? | `200` → `EventDetailResponse` · `404` if event not found in group |
+| `POST /` | Create an event, as the caller. The creator is auto-added as an attendee. | `Title` string<br>`Date` string (`yyyy-MM-dd`)<br>`LocationId` guid?<br>`MaxAttendees` int<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]` | `201 Created` → `EventDetailResponse` · `404` if group not found · `400` if the caller isn't a member of the group |
+| `PATCH /{id}` | Partially update an event. Only supplied fields are changed. Supplying `CourtBookings` replaces the entire collection. | `Title` string?<br>`Date` string?<br>`LocationId` guid?<br>`MaxAttendees` int?<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]`? | `200` → `EventDetailResponse` · `404` if event not found in group |
 | `DELETE /{id}` | Delete an event. | — | `204` · `404` if event not found in group |
 | `POST /{id}/rsvp` | Join an event as the caller — added to `Attendees` if under `MaxAttendees`, otherwise to `Waitlist`. | — | `200` → `EventDetailResponse` · `404` if event not found · `400` if caller not in group · `409` if already joined or waitlisted |
 | `DELETE /{id}/rsvp/me` | Leave an event as the caller. If the caller was an attendee, the longest-waiting waitlisted member (if any) is promoted to fill the spot. | — | `200` → `EventDetailResponse` · `404` if event not found |
 | `POST /{id}/expenses` | Record an expense against an event. `PaidByMemberId` names an arbitrary existing group member ("who paid") — not necessarily the caller. | `Description` string<br>`Amount` decimal<br>`PaidByMemberId` guid | `201 Created` → `ExpenseResponse` · `404` if event not found · `400` if `PaidByMemberId` not in group |
-| `POST /{id}/confirm` | Confirm a draft event as the caller: the location option with the most votes wins, all voters/attendees are merged into the final attendee list (plus the confirming caller), and location options are cleared. | — | `200` → `EventDetailResponse` · `404` if event not found, caller not a member, or event not in `Draft` status |
-| `POST /{id}/location-options/{optionId}/votes` | Vote for a location option as the caller. | — | `200` → `EventDetailResponse` · `404` if option not found · `409` if already voted |
-| `DELETE /{id}/location-options/{optionId}/votes/me` | Remove the caller's vote. | — | `200` → `EventDetailResponse` · `404` if no such vote exists |
 
 ## Health
 
@@ -90,12 +87,11 @@ Base path: `/api/groups/{groupId}/events`
 MemberResponse       { Id: guid, Name: string }
 LocationResponse     { Id: guid, Name: string, Address: string }
 CourtBookingResponse { Id: guid, Court: string, StartTime: string, EndTime: string }
-LocationOptionResponse { Id: guid, LocationName: string, Votes: MemberResponse[] }
 BalanceResponse      { Member: MemberResponse, Balance: decimal }
 CostBreakdownResponse { TotalCost: decimal, CostPerAttendee: decimal, Balances: BalanceResponse[] }
 
 EventSummaryResponse {
-  Id: guid, Title: string, Date: string, Status: "draft" | "confirmed",
+  Id: guid, Title: string, Date: string,
   AttendeeCount: int, MaxAttendees: int, LocationName: string?
 }
 
@@ -107,8 +103,6 @@ EventDetailResponse {
   Attendees: MemberResponse[], Waitlist: MemberResponse[],
   Expenses: ExpenseResponse[],
   CreatedBy: MemberResponse,
-  Status: "draft" | "confirmed",
-  LocationOptions: LocationOptionResponse[]?,
   CostBreakdown: CostBreakdownResponse
 }
 
