@@ -14,6 +14,13 @@ public record GroupResponse(
     Guid? AdminMemberId
 );
 
+public record GroupSummaryResponse(
+    Guid Id,
+    string Name,
+    string Code,
+    int MemberCount
+);
+
 public record LocationResponse(Guid Id, string Name, string Address);
 
 public record CourtBookingResponse(Guid Id, string Court, string StartTime, string EndTime);

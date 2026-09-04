@@ -74,22 +74,6 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
         ));
     }
 
-    public GroupResponse MapGroupSummary(Group group, string clerkUserId)
-    {
-        var currentMember = group.Members.FirstOrDefault(m => m.ClerkUserId == clerkUserId);
-        return new(
-            group.Id,
-            group.Name,
-            group.Code,
-            group.Members.Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
-            [],
-            group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
-            group.PrimaryLocationId,
-            currentMember?.Id,
-            group.AdminMemberId
-        );
-    }
-
     public static string StatusString(EventStatus status) =>
         status == EventStatus.Draft ? "draft" : "confirmed";
 }

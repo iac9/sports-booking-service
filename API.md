@@ -31,7 +31,7 @@ shape changes, update this file in the same change.
 
 | Endpoint | Description | Response |
 |---|---|---|
-| `GET /api/users/me/groups` | Returns every group the caller (resolved from the token's `sub` claim) belongs to, as lightweight summaries — `Members` and `Locations` are populated but `Events` is always `[]`. Use `GET /api/groups/code/{code}` to fetch full detail (including events) for a specific group. | `200` → `GroupResponse[]` (see [Group shape](#group-shape)) |
+| `GET /api/users/me/groups` | Returns every group the caller (resolved from the token's `sub` claim) belongs to, as lightweight summaries — `Members`, `Locations`, and `Events` are omitted entirely; only a `MemberCount` is included. Use `GET /api/groups/code/{code}` to fetch full detail (members, locations, and events) for a specific group. | `200` → `GroupSummaryResponse[]` (see [Group shape](#group-shape)) |
 
 ## Groups
 
@@ -122,5 +122,10 @@ GroupResponse {
   PrimaryLocationId: guid?,
   CurrentMemberId: guid?,  // the caller's own Member.Id in this group; null if not a member
   AdminMemberId: guid  // the Member.Id of the group's admin — the member who created it; only the admin may rename or delete the group
+}
+
+GroupSummaryResponse {
+  Id: guid, Name: string, Code: string,
+  MemberCount: int
 }
 ```
