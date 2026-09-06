@@ -25,5 +25,6 @@ public record UpdateEventRequest(
 );
 
 public record AddExpenseRequest(string Description, decimal Amount, Guid PaidByMemberId);
+public record AddGuestRequest(string? Name);
 public record CreateLocationRequest(string Name, string Address);
 public record UpdateLocationRequest(string? Name, string? Address);

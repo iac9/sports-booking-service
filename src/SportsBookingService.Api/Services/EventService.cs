@@ -153,6 +153,77 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         return ServiceResult<EventDetailResponse>.Success(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
     }
 
+    // ── Guests ───────────────────────────────────────────────────────────────────
+
+    public async Task<ServiceResult<EventDetailResponse>> AddGuestAsync(Guid groupId, Guid id, AddGuestRequest request)
+    {
+        var ev = await db.Events
+            .Include(e => e.Attendees).ThenInclude(a => a.Member)
+            .Include(e => e.Waitlist).ThenInclude(w => w.Member)
+            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
+
+        if (ev is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.NotFound);
+
+        var host = await currentMemberService.FindMemberAsync(groupId);
+        if (host is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
+        var existingGuestCount = ev.Attendees.Select(a => a.Member)
+            .Concat(ev.Waitlist.Select(w => w.Member))
+            .Count(m => m.AddedByMemberId == host.Id);
+
+        var name = string.IsNullOrWhiteSpace(request.Name) ? $"{host.Name} + {existingGuestCount + 1}" : request.Name.Trim();
+        var guest = new Member { Id = Guid.NewGuid(), Name = name, GroupId = groupId, IsGuest = true, AddedByMemberId = host.Id };
+        db.Members.Add(guest);
+
+        if (ev.MaxAttendees is null || ev.Attendees.Count < ev.MaxAttendees)
+            db.Attendees.Add(new Attendee { EventId = id, MemberId = guest.Id, JoinedAt = DateTime.UtcNow });
+        else
+            db.WaitlistEntries.Add(new WaitlistEntry { EventId = id, MemberId = guest.Id, JoinedAt = DateTime.UtcNow });
+
+        await db.SaveChangesAsync();
+        return ServiceResult<EventDetailResponse>.Success(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+    }
+
+    public async Task<ServiceResult<EventDetailResponse>> RemoveGuestAsync(Guid groupId, Guid id, Guid guestMemberId)
+    {
+        var ev = await db.Events
+            .Include(e => e.Attendees)
+            .Include(e => e.Waitlist)
+            .FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
+
+        if (ev is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.NotFound);
+
+        var host = await currentMemberService.FindMemberAsync(groupId);
+        if (host is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
+        var guest = await db.Members.FirstOrDefaultAsync(m => m.Id == guestMemberId && m.GroupId == groupId && m.IsGuest);
+        if (guest is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.NotFound);
+        if (guest.AddedByMemberId != host.Id) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.Forbidden);
+
+        var attendee = ev.Attendees.FirstOrDefault(a => a.MemberId == guestMemberId);
+        if (attendee is not null)
+        {
+            ev.Attendees.Remove(attendee);
+            var first = ev.Waitlist.OrderBy(w => w.JoinedAt).FirstOrDefault();
+            if (first is not null)
+            {
+                ev.Waitlist.Remove(first);
+                var promoted = new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow };
+                db.Attendees.Add(promoted);
+                ev.Attendees.Add(promoted);
+            }
+        }
+        else
+        {
+            var waitlisted = ev.Waitlist.FirstOrDefault(w => w.MemberId == guestMemberId);
+            if (waitlisted is not null) ev.Waitlist.Remove(waitlisted);
+        }
+
+        db.Members.Remove(guest);
+        await db.SaveChangesAsync();
+        return ServiceResult<EventDetailResponse>.Success(eventMapper.MapDetail((await eventMapper.LoadEvent(groupId, id))!));
+    }
+
     // ── Expenses ─────────────────────────────────────────────────────────────────
 
     public async Task<ServiceResult<ExpenseResponse>> AddExpenseAsync(Guid groupId, Guid id, AddExpenseRequest request)

@@ -71,6 +71,8 @@ Base path: `/api/groups/{groupId}/events`
 | `DELETE /{id}` | Delete an event. | — | `204` · `404` if event not found in group |
 | `POST /{id}/rsvp` | Join an event as the caller — added to `Attendees` if under `MaxAttendees`, otherwise to `Waitlist`. If `MaxAttendees` is `null` (unlimited), always added to `Attendees`, never waitlisted. | — | `200` → `EventDetailResponse` · `404` if event not found · `400` if caller not in group · `409` if already joined or waitlisted |
 | `DELETE /{id}/rsvp/me` | Leave an event as the caller. If the caller was an attendee, the longest-waiting waitlisted member (if any) is promoted to fill the spot. | — | `200` → `EventDetailResponse` · `404` if event not found |
+| `POST /{id}/guests` | Add a guest to an event, hosted by the caller. The guest is a real `Member` (`IsGuest: true`, `AddedByMemberId` = caller's member id) added to `Attendees` if under `MaxAttendees`, otherwise `Waitlist` — same capacity rules as `/rsvp`. If `Name` is omitted/blank, it defaults to `"<caller's name> + n"`, where `n` counts the caller's other guests already on this event. Guests never appear in `GroupResponse.Members` or `GET /api/groups/{id}/members`. | `Name` string? | `200` → `EventDetailResponse` · `404` if event not found · `400` if caller not in group |
+| `DELETE /{id}/guests/{guestId}` | Remove a guest from an event. Only the member who added the guest (`AddedByMemberId`) may remove them. If the guest was an attendee, the longest-waiting waitlisted member (if any) is promoted, same as `/rsvp/me`. The guest's `Member` row is deleted entirely. | — | `200` → `EventDetailResponse` · `404` if event or guest not found · `403` if caller didn't add this guest |
 | `POST /{id}/expenses` | Record an expense against an event. `PaidByMemberId` names an arbitrary existing group member ("who paid") — not necessarily the caller. | `Description` string<br>`Amount` decimal<br>`PaidByMemberId` guid | `201 Created` → `ExpenseResponse` · `404` if event not found · `400` if `PaidByMemberId` not in group |
 
 ## Health
@@ -84,7 +86,10 @@ Base path: `/api/groups/{groupId}/events`
 
 ### Group shape
 ```
-MemberResponse       { Id: guid, Name: string }
+MemberResponse       { Id: guid, Name: string, IsGuest: bool, AddedByMemberId: guid? }
+                     // IsGuest/AddedByMemberId are only ever true/set on entries inside an
+                     // event's Attendees/Waitlist — guests are excluded from GroupResponse.Members
+                     // and GET /api/groups/{id}/members entirely.
 LocationResponse     { Id: guid, Name: string, Address: string }
 CourtBookingResponse { Id: guid, Court: string, StartTime: string, EndTime: string }
 BalanceResponse      { Member: MemberResponse, Balance: decimal }

@@ -1,6 +1,6 @@
 namespace SportsBookingService.Api.DTOs;
 
-public record MemberResponse(Guid Id, string Name);
+public record MemberResponse(Guid Id, string Name, bool IsGuest = false, Guid? AddedByMemberId = null);
 
 public record GroupResponse(
     Guid Id,

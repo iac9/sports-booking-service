@@ -7,4 +7,6 @@ public class Member
     public string? ClerkUserId { get; set; }
     public Guid GroupId { get; set; }
     public Group Group { get; set; } = null!;
+    public bool IsGuest { get; set; } = false;
+    public Guid? AddedByMemberId { get; set; }
 }

@@ -51,7 +51,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
     public async Task<ActionResult<List<MemberResponse>>> GetMembers(Guid id)
     {
         var members = await db.Members
-            .Where(m => m.GroupId == id)
+            .Where(m => m.GroupId == id && !m.IsGuest)
             .OrderBy(m => m.Name)
             .Select(m => new MemberResponse(m.Id, m.Name))
             .ToListAsync();

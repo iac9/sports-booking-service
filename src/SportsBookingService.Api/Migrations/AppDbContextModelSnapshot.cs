@@ -195,11 +195,17 @@ namespace SportsBookingService.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AddedByMemberId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ClerkUserId")
                         .HasColumnType("text");
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsGuest")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()

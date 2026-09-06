@@ -71,6 +71,22 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, EventSer
         return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
+    // ── Guests ───────────────────────────────────────────────────────────────────
+
+    [HttpPost("{id:guid}/guests")]
+    public async Task<ActionResult<EventDetailResponse>> AddGuest(Guid groupId, Guid id, AddGuestRequest request)
+    {
+        var result = await eventService.AddGuestAsync(groupId, id, request);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
+    }
+
+    [HttpDelete("{id:guid}/guests/{guestId:guid}")]
+    public async Task<ActionResult<EventDetailResponse>> RemoveGuest(Guid groupId, Guid id, Guid guestId)
+    {
+        var result = await eventService.RemoveGuestAsync(groupId, id, guestId);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
+    }
+
     // ── Expenses ─────────────────────────────────────────────────────────────────
 
     [HttpPost("{id:guid}/expenses")]
