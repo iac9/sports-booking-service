@@ -133,20 +133,19 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         var attendee = ev.Attendees.FirstOrDefault(a => a.MemberId == member.Id);
         if (attendee is not null)
         {
-            ev.Attendees.Remove(attendee);
+            db.Attendees.Remove(attendee);
             var first = ev.Waitlist.OrderBy(w => w.JoinedAt).FirstOrDefault();
             if (first is not null)
             {
-                ev.Waitlist.Remove(first);
+                db.WaitlistEntries.Remove(first);
                 var promoted = new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow };
                 db.Attendees.Add(promoted);
-                ev.Attendees.Add(promoted);
             }
         }
         else
         {
             var waitlisted = ev.Waitlist.FirstOrDefault(w => w.MemberId == member.Id);
-            if (waitlisted is not null) ev.Waitlist.Remove(waitlisted);
+            if (waitlisted is not null) db.WaitlistEntries.Remove(waitlisted);
         }
 
         await db.SaveChangesAsync();
@@ -203,20 +202,19 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         var attendee = ev.Attendees.FirstOrDefault(a => a.MemberId == guestMemberId);
         if (attendee is not null)
         {
-            ev.Attendees.Remove(attendee);
+            db.Attendees.Remove(attendee);
             var first = ev.Waitlist.OrderBy(w => w.JoinedAt).FirstOrDefault();
             if (first is not null)
             {
-                ev.Waitlist.Remove(first);
+                db.WaitlistEntries.Remove(first);
                 var promoted = new Attendee { EventId = id, MemberId = first.MemberId, JoinedAt = DateTime.UtcNow };
                 db.Attendees.Add(promoted);
-                ev.Attendees.Add(promoted);
             }
         }
         else
         {
             var waitlisted = ev.Waitlist.FirstOrDefault(w => w.MemberId == guestMemberId);
-            if (waitlisted is not null) ev.Waitlist.Remove(waitlisted);
+            if (waitlisted is not null) db.WaitlistEntries.Remove(waitlisted);
         }
 
         db.Members.Remove(guest);
