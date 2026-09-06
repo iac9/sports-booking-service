@@ -12,7 +12,7 @@ public record CreateEventRequest(
     string Title,
     string Date,
     Guid? LocationId,
-    int MaxAttendees,
+    int? MaxAttendees,
     List<CreateCourtBookingRequest> CourtBookings
 );
 

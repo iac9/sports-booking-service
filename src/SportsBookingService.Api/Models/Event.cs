@@ -7,7 +7,7 @@ public class Event
     public DateOnly Date { get; set; }
     public Guid? LocationId { get; set; }
     public Location? Location { get; set; }
-    public int MaxAttendees { get; set; }
+    public int? MaxAttendees { get; set; }
     public Guid GroupId { get; set; }
     public Group Group { get; set; } = null!;
     public Guid CreatedByMemberId { get; set; }

@@ -86,7 +86,7 @@ namespace SportsBookingService.Api.Migrations
                     b.Property<Guid?>("LocationId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("MaxAttendees")
+                    b.Property<int?>("MaxAttendees")
                         .HasColumnType("integer");
 
                     b.Property<string>("Title")

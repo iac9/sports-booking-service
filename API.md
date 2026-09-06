@@ -66,10 +66,10 @@ Base path: `/api/groups/{groupId}/events`
 |---|---|---|---|
 | `GET /` | List a group's events, ordered by date. | — | `200` → `EventSummaryResponse[]` |
 | `GET /{id}` | Get a single event. | — | `200` → `EventDetailResponse` · `404` if event not found in group |
-| `POST /` | Create an event, as the caller. The creator is auto-added as an attendee. | `Title` string<br>`Date` string (`yyyy-MM-dd`)<br>`LocationId` guid?<br>`MaxAttendees` int<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]` | `201 Created` → `EventDetailResponse` · `404` if group not found · `400` if the caller isn't a member of the group |
-| `PATCH /{id}` | Partially update an event. Only supplied fields are changed. Supplying `CourtBookings` replaces the entire collection. | `Title` string?<br>`Date` string?<br>`LocationId` guid?<br>`MaxAttendees` int?<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]`? | `200` → `EventDetailResponse` · `404` if event not found in group |
+| `POST /` | Create an event, as the caller. The creator is auto-added as an attendee. | `Title` string<br>`Date` string (`yyyy-MM-dd`)<br>`LocationId` guid?<br>`MaxAttendees` int? (`null` = unlimited attendance)<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]` | `201 Created` → `EventDetailResponse` · `404` if group not found · `400` if the caller isn't a member of the group |
+| `PATCH /{id}` | Partially update an event. Only supplied fields are changed, **except `MaxAttendees`, which is always overwritten with whatever is supplied (including `null`, to clear an existing limit)** — this is the only field where a JSON `null` is distinguishable from "not supplied" in practice, since the frontend always sends it. Supplying `CourtBookings` replaces the entire collection. | `Title` string?<br>`Date` string?<br>`LocationId` guid?<br>`MaxAttendees` int? (`null` = unlimited)<br>`CourtBookings` `{ Court: string, StartTime: string, EndTime: string }[]`? | `200` → `EventDetailResponse` · `404` if event not found in group |
 | `DELETE /{id}` | Delete an event. | — | `204` · `404` if event not found in group |
-| `POST /{id}/rsvp` | Join an event as the caller — added to `Attendees` if under `MaxAttendees`, otherwise to `Waitlist`. | — | `200` → `EventDetailResponse` · `404` if event not found · `400` if caller not in group · `409` if already joined or waitlisted |
+| `POST /{id}/rsvp` | Join an event as the caller — added to `Attendees` if under `MaxAttendees`, otherwise to `Waitlist`. If `MaxAttendees` is `null` (unlimited), always added to `Attendees`, never waitlisted. | — | `200` → `EventDetailResponse` · `404` if event not found · `400` if caller not in group · `409` if already joined or waitlisted |
 | `DELETE /{id}/rsvp/me` | Leave an event as the caller. If the caller was an attendee, the longest-waiting waitlisted member (if any) is promoted to fill the spot. | — | `200` → `EventDetailResponse` · `404` if event not found |
 | `POST /{id}/expenses` | Record an expense against an event. `PaidByMemberId` names an arbitrary existing group member ("who paid") — not necessarily the caller. | `Description` string<br>`Amount` decimal<br>`PaidByMemberId` guid | `201 Created` → `ExpenseResponse` · `404` if event not found · `400` if `PaidByMemberId` not in group |
 
@@ -92,14 +92,14 @@ CostBreakdownResponse { TotalCost: decimal, CostPerAttendee: decimal, Balances: 
 
 EventSummaryResponse {
   Id: guid, Title: string, Date: string,
-  AttendeeCount: int, MaxAttendees: int, LocationName: string?
+  AttendeeCount: int, MaxAttendees: int?, LocationName: string?
 }
 
 EventDetailResponse {
   Id: guid, Title: string, Date: string,
   CourtBookings: CourtBookingResponse[],
   LocationId: guid?, LocationName: string?,
-  MaxAttendees: int,
+  MaxAttendees: int?,  // null = unlimited attendance, no waitlist
   Attendees: MemberResponse[], Waitlist: MemberResponse[],
   Expenses: ExpenseResponse[],
   CreatedBy: MemberResponse,

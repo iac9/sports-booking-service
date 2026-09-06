@@ -51,7 +51,7 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         if (request.Title is not null) ev.Title = request.Title;
         if (request.Date is not null) ev.Date = DateOnly.Parse(request.Date);
         if (request.LocationId is not null) ev.LocationId = request.LocationId;
-        if (request.MaxAttendees is not null) ev.MaxAttendees = request.MaxAttendees.Value;
+        ev.MaxAttendees = request.MaxAttendees;
 
         if (request.CourtBookings is not null)
         {
@@ -101,7 +101,7 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         if (ev.Attendees.Any(a => a.MemberId == member.Id) || ev.Waitlist.Any(w => w.MemberId == member.Id))
             return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.Conflict, "Already joined or waitlisted.");
 
-        if (ev.Attendees.Count < ev.MaxAttendees)
+        if (ev.MaxAttendees is null || ev.Attendees.Count < ev.MaxAttendees)
         {
             var attendee = new Attendee { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow };
             db.Attendees.Add(attendee);

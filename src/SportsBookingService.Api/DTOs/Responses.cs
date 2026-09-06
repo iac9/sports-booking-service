@@ -46,7 +46,7 @@ public record EventSummaryResponse(
     string Title,
     string Date,
     int AttendeeCount,
-    int MaxAttendees,
+    int? MaxAttendees,
     string? LocationName
 );
 
@@ -57,7 +57,7 @@ public record EventDetailResponse(
     List<CourtBookingResponse> CourtBookings,
     Guid? LocationId,
     string? LocationName,
-    int MaxAttendees,
+    int? MaxAttendees,
     List<MemberResponse> Attendees,
     List<MemberResponse> Waitlist,
     List<ExpenseResponse> Expenses,
