@@ -124,4 +124,59 @@ public class LeaveRejoinDuplicationTests : IDisposable
         var attendees = await db.Attendees.Where(a => a.EventId == eventId).AsNoTracking().ToListAsync();
         Assert.Empty(attendees);
     }
+
+    // Reproduces the "join twice" duplicate seen live: within a *single* RsvpAsync call, the guard
+    // query at the top tracks the Event with Attendees marked IsLoaded, then db.Attendees.Add(...)
+    // fixes the new row into that already-loaded collection, and the eventMapper.LoadEvent(...)
+    // re-query at the end re-materializes the same already-loaded collection, appending the new row
+    // a second time instead of recognizing it's already present — so the *response to a single join
+    // request* comes back with the joining member listed twice.
+    [Fact]
+    public async Task Rsvp_SingleRequest_DoesNotDuplicateAttendeeInResponse()
+    {
+        using var db = NewContext();
+        var service = NewEventService(db);
+
+        var createResult = await service.CreateAsync(groupId, new CreateEventRequest(
+            "Badminton", "2026-06-21", null, null, []));
+        Assert.True(createResult.IsSuccess);
+        var eventId = createResult.Value!.Id;
+
+        var leaveResult = await service.LeaveAsync(groupId, eventId);
+        Assert.True(leaveResult.IsSuccess);
+
+        var rsvpResult = await service.RsvpAsync(groupId, eventId);
+        Assert.True(rsvpResult.IsSuccess);
+
+        var attendeeIds = rsvpResult.Value!.Attendees.Select(a => a.Id).ToList();
+        Assert.Single(attendeeIds);
+        Assert.Equal(creatorId, attendeeIds[0]);
+    }
+
+    // Same bug class as Rsvp_SingleRequest_DoesNotDuplicateAttendeeInResponse, but for
+    // UpdateAsync's CourtBookings replacement: the guard query loads Event.CourtBookings as
+    // IsLoaded, then db.CourtBookings.Add(...) auto-fixes-up the new booking into that collection,
+    // so an additional explicit ev.CourtBookings.Add(...) would double it up before the final
+    // LoadEvent() re-query.
+    [Fact]
+    public async Task Update_SingleRequest_DoesNotDuplicateCourtBookingsInResponse()
+    {
+        using var db = NewContext();
+        var service = NewEventService(db);
+
+        var createResult = await service.CreateAsync(groupId, new CreateEventRequest(
+            "Badminton", "2026-06-21", null, null, []));
+        Assert.True(createResult.IsSuccess);
+        var eventId = createResult.Value!.Id;
+
+        var updateResult = await service.UpdateAsync(groupId, eventId, new UpdateEventRequest(
+            "Badminton", "2026-06-21", null, null,
+            [
+                new CreateCourtBookingRequest("Court 1", "18:00", "19:00"),
+                new CreateCourtBookingRequest("Court 2", "19:00", "20:00"),
+            ]));
+        Assert.True(updateResult.IsSuccess);
+
+        Assert.Equal(2, updateResult.Value!.CourtBookings.Count);
+    }
 }

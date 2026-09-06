@@ -56,16 +56,12 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         if (request.CourtBookings is not null)
         {
             foreach (var cb in ev.CourtBookings.ToList())
-            {
-                ev.CourtBookings.Remove(cb);
                 db.CourtBookings.Remove(cb);
-            }
 
             foreach (var cb in request.CourtBookings)
             {
                 var newBooking = new CourtBooking { Id = Guid.NewGuid(), Court = cb.Court, StartTime = cb.StartTime, EndTime = cb.EndTime, EventId = ev.Id };
                 db.CourtBookings.Add(newBooking);
-                ev.CourtBookings.Add(newBooking);
             }
         }
 
@@ -105,13 +101,11 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         {
             var attendee = new Attendee { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow };
             db.Attendees.Add(attendee);
-            ev.Attendees.Add(attendee);
         }
         else
         {
             var waitlistEntry = new WaitlistEntry { EventId = id, MemberId = member.Id, JoinedAt = DateTime.UtcNow };
             db.WaitlistEntries.Add(waitlistEntry);
-            ev.Waitlist.Add(waitlistEntry);
         }
 
         await db.SaveChangesAsync();
