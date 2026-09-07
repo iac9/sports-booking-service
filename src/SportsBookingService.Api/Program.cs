@@ -71,6 +71,7 @@ builder.Services.AddScoped<EventMapper>();
 builder.Services.AddScoped<CurrentMemberService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<DebtService>();
 
 var app = builder.Build();
 

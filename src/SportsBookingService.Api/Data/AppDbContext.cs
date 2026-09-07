@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Attendee> Attendees => Set<Attendee>();
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<Settlement> Settlements => Set<Settlement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,5 +46,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(m => new { m.GroupId, m.ClerkUserId })
             .IsUnique()
             .HasFilter("\"ClerkUserId\" IS NOT NULL");
+
+        modelBuilder.Entity<Settlement>()
+            .HasOne(s => s.FromMember)
+            .WithMany()
+            .HasForeignKey(s => s.FromMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Settlement>()
+            .HasOne(s => s.ToMember)
+            .WithMany()
+            .HasForeignKey(s => s.ToMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Settlement>()
+            .HasIndex(s => new { s.EventId, s.FromMemberId, s.ToMemberId })
+            .IsUnique();
     }
 }

@@ -220,6 +220,39 @@ namespace SportsBookingService.Api.Migrations
                     b.ToTable("Members");
                 });
 
+            modelBuilder.Entity("SportsBookingService.Api.Models.Settlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FromMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SettledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ToMemberId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromMemberId");
+
+                    b.HasIndex("ToMemberId");
+
+                    b.HasIndex("EventId", "FromMemberId", "ToMemberId")
+                        .IsUnique();
+
+                    b.ToTable("Settlements");
+                });
+
             modelBuilder.Entity("SportsBookingService.Api.Models.WaitlistEntry", b =>
                 {
                     b.Property<Guid>("EventId")
@@ -344,6 +377,33 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Group");
                 });
 
+            modelBuilder.Entity("SportsBookingService.Api.Models.Settlement", b =>
+                {
+                    b.HasOne("SportsBookingService.Api.Models.Event", "Event")
+                        .WithMany("Settlements")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SportsBookingService.Api.Models.Member", "FromMember")
+                        .WithMany()
+                        .HasForeignKey("FromMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SportsBookingService.Api.Models.Member", "ToMember")
+                        .WithMany()
+                        .HasForeignKey("ToMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("FromMember");
+
+                    b.Navigation("ToMember");
+                });
+
             modelBuilder.Entity("SportsBookingService.Api.Models.WaitlistEntry", b =>
                 {
                     b.HasOne("SportsBookingService.Api.Models.Event", "Event")
@@ -370,6 +430,8 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("CourtBookings");
 
                     b.Navigation("Expenses");
+
+                    b.Navigation("Settlements");
 
                     b.Navigation("Waitlist");
                 });

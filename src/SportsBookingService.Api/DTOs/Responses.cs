@@ -35,6 +35,16 @@ public record ExpenseResponse(
 
 public record BalanceResponse(MemberResponse Member, decimal Balance);
 
+public record DebtResponse(
+    Guid EventId,
+    string EventTitle,
+    string Date,
+    MemberResponse FromMember,
+    decimal Amount,
+    bool Settled,
+    string? SettledAt
+);
+
 public record CostBreakdownResponse(
     decimal TotalCost,
     decimal CostPerAttendee,

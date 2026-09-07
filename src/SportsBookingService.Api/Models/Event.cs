@@ -16,4 +16,5 @@ public class Event
     public ICollection<Attendee> Attendees { get; set; } = [];
     public ICollection<WaitlistEntry> Waitlist { get; set; } = [];
     public ICollection<Expense> Expenses { get; set; } = [];
+    public ICollection<Settlement> Settlements { get; set; } = [];
 }

@@ -77,6 +77,15 @@ Base path: `/api/groups/{groupId}/events`
 | `PATCH /{id}/expenses/{expenseId}` | Partially update an expense. Only supplied fields are changed. Any group member may edit any expense — there's no "added by" restriction. | `Description` string?<br>`Amount` decimal?<br>`PaidByMemberId` guid? | `200` → `ExpenseResponse` · `404` if event or expense not found · `400` if `PaidByMemberId` not in group |
 | `DELETE /{id}/expenses/{expenseId}` | Delete an expense. Any group member may delete any expense. | — | `204` · `404` if event or expense not found |
 
+## Members
+
+Base path: `/api/groups/{groupId}/members/{memberId}`
+
+| Endpoint | Description | Request Body | Response |
+|---|---|---|---|
+| `GET /debts-owed` | List every unsettled debt owed *to* `memberId`, one row per event per debtor, computed by running the debt-simplification algorithm (greedy largest-creditor/largest-debtor matching) over each event's `CostBreakdown.Balances`. Ordered by event date descending. Settling a debt (see below) removes it from this list permanently — settled debts are excluded, not flagged. | — | `200` → `DebtResponse[]` · `404` if group not found |
+| `POST /debts-owed/settle` | Mark a debt as settled — only `memberId` (the caller, resolved from the token) may settle a debt owed to them; `403` otherwise. Once settled, the debt is excluded from future `GET /debts-owed` calls for good, on both sides of the transaction. Idempotent — settling an already-settled `(EventId, FromMemberId)` pair returns the existing settlement unchanged. | `EventId` guid<br>`FromMemberId` guid<br>`Amount` decimal | `200` → `DebtResponse` · `404` if group, event, or `FromMemberId` not found · `400` if caller isn't a member of the group · `403` if caller isn't `memberId` |
+
 ## Health
 
 | Endpoint | Description | Response |
@@ -96,6 +105,7 @@ LocationResponse     { Id: guid, Name: string, Address: string }
 CourtBookingResponse { Id: guid, Court: string, StartTime: string, EndTime: string }
 BalanceResponse      { Member: MemberResponse, Balance: decimal }
 CostBreakdownResponse { TotalCost: decimal, CostPerAttendee: decimal, Balances: BalanceResponse[] }
+DebtResponse         { EventId: guid, EventTitle: string, Date: string, FromMember: MemberResponse, Amount: decimal, Settled: bool, SettledAt: string? }
 
 EventSummaryResponse {
   Id: guid, Title: string, Date: string,
