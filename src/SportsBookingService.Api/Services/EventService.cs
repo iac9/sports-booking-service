@@ -244,4 +244,40 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         return ServiceResult<ExpenseResponse>.Success(response);
     }
+
+    public async Task<ServiceResult<ExpenseResponse>> UpdateExpenseAsync(Guid groupId, Guid id, Guid expenseId, UpdateExpenseRequest request)
+    {
+        var expense = await db.Expenses
+            .Include(e => e.PaidBy)
+            .FirstOrDefaultAsync(e => e.Id == expenseId && e.EventId == id && e.Event.GroupId == groupId);
+        if (expense is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.NotFound);
+
+        if (request.Description is not null) expense.Description = request.Description;
+        if (request.Amount is not null) expense.Amount = request.Amount.Value;
+        if (request.PaidByMemberId is not null)
+        {
+            var paidBy = await db.Members.FirstOrDefaultAsync(m => m.Id == request.PaidByMemberId && m.GroupId == groupId);
+            if (paidBy is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+            expense.PaidByMemberId = paidBy.Id;
+            expense.PaidBy = paidBy;
+        }
+
+        await db.SaveChangesAsync();
+
+        var response = new ExpenseResponse(expense.Id, expense.Description, expense.Amount,
+            new MemberResponse(expense.PaidBy.Id, expense.PaidBy.Name),
+            expense.CreatedAt.ToString("o"));
+
+        return ServiceResult<ExpenseResponse>.Success(response);
+    }
+
+    public async Task<ServiceResult> DeleteExpenseAsync(Guid groupId, Guid id, Guid expenseId)
+    {
+        var expense = await db.Expenses.FirstOrDefaultAsync(e => e.Id == expenseId && e.EventId == id && e.Event.GroupId == groupId);
+        if (expense is null) return ServiceResult.Fail(ServiceErrorKind.NotFound);
+
+        db.Expenses.Remove(expense);
+        await db.SaveChangesAsync();
+        return ServiceResult.Success();
+    }
 }

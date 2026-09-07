@@ -96,4 +96,18 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, EventSer
         if (!result.IsSuccess) return this.ToActionResult(result.Error!);
         return CreatedAtAction(nameof(Get), new { groupId, id }, result.Value);
     }
+
+    [HttpPatch("{id:guid}/expenses/{expenseId:guid}")]
+    public async Task<ActionResult<ExpenseResponse>> UpdateExpense(Guid groupId, Guid id, Guid expenseId, UpdateExpenseRequest request)
+    {
+        var result = await eventService.UpdateExpenseAsync(groupId, id, expenseId, request);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
+    }
+
+    [HttpDelete("{id:guid}/expenses/{expenseId:guid}")]
+    public async Task<IActionResult> DeleteExpense(Guid groupId, Guid id, Guid expenseId)
+    {
+        var result = await eventService.DeleteExpenseAsync(groupId, id, expenseId);
+        return result.IsSuccess ? NoContent() : this.ToActionResult(result.Error!);
+    }
 }
