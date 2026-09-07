@@ -63,6 +63,8 @@ public class DebtService(AppDbContext db, CostService costService, CurrentMember
             return ServiceResult<DebtResponse>.Fail(ServiceErrorKind.Forbidden);
 
         var ev = await db.Events
+            .Include(e => e.Attendees).ThenInclude(a => a.Member)
+            .Include(e => e.Expenses).ThenInclude(ex => ex.PaidBy)
             .Include(e => e.Settlements)
             .FirstOrDefaultAsync(e => e.Id == request.EventId && e.GroupId == groupId);
         if (ev is null) return ServiceResult<DebtResponse>.Fail(ServiceErrorKind.NotFound);
@@ -73,13 +75,21 @@ public class DebtService(AppDbContext db, CostService costService, CurrentMember
         var settlement = ev.Settlements.FirstOrDefault(s => s.FromMemberId == request.FromMemberId && s.ToMemberId == toMemberId);
         if (settlement is null)
         {
+            // Never trust a client-supplied amount here — settling permanently deletes the debt,
+            // so the amount must be recomputed from current state, the same way GetOwedToMemberAsync does.
+            var breakdown = costService.Calculate(ev.Attendees, ev.Expenses);
+            var debt = DebtSimplifier.Simplify(breakdown.Balances)
+                .FirstOrDefault(tx => tx.From.Id == request.FromMemberId && tx.To.Id == toMemberId);
+            if (debt is null)
+                return ServiceResult<DebtResponse>.Fail(ServiceErrorKind.BadRequest, "No outstanding debt between these members for this event.");
+
             settlement = new Settlement
             {
                 Id = Guid.NewGuid(),
                 EventId = ev.Id,
                 FromMemberId = request.FromMemberId,
                 ToMemberId = toMemberId,
-                Amount = request.Amount,
+                Amount = debt.Amount,
                 SettledAt = DateTime.UtcNow,
             };
             db.Settlements.Add(settlement);

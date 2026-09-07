@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
@@ -11,6 +12,7 @@ namespace SportsBookingService.Api.Controllers;
 public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService, CurrentMemberService currentMemberService) : ControllerBase
 {
     [HttpGet("code/{code}")]
+    [EnableRateLimiting("GroupLookup")]
     public async Task<ActionResult<GroupResponse>> GetByCode(string code)
     {
         var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
@@ -72,6 +74,7 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
     }
 
     [HttpPost("join")]
+    [EnableRateLimiting("GroupLookup")]
     public async Task<ActionResult<GroupResponse?>> JoinByCode(JoinGroupByCodeRequest request) =>
         Ok(await groupService.JoinByCodeAsync(request));
 
