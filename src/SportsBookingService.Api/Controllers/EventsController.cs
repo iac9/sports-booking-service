@@ -8,11 +8,14 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups/{groupId:guid}/events")]
-public class EventsController(AppDbContext db, EventMapper eventMapper, EventService eventService) : ControllerBase
+public class EventsController(AppDbContext db, EventMapper eventMapper, EventService eventService, CurrentMemberService currentMemberService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<EventSummaryResponse>>> List(Guid groupId)
     {
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
+
         var events = await db.Events
             .Include(e => e.Location)
             .Where(e => e.GroupId == groupId)
@@ -29,6 +32,9 @@ public class EventsController(AppDbContext db, EventMapper eventMapper, EventSer
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EventDetailResponse>> Get(Guid groupId, Guid id)
     {
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
+
         var ev = await eventMapper.LoadEvent(groupId, id);
         return ev is null ? NotFound() : Ok(eventMapper.MapDetail(ev));
     }

@@ -8,7 +8,7 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups")]
-public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService) : ControllerBase
+public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService, CurrentMemberService currentMemberService) : ControllerBase
 {
     [HttpGet("code/{code}")]
     public async Task<ActionResult<GroupResponse>> GetByCode(string code)
@@ -16,7 +16,10 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
         var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
             .FirstOrDefaultAsync(g => g.Code == code.ToUpperInvariant());
 
-        return group is null ? NotFound() : Ok(await eventMapper.MapGroupAsync(group));
+        if (group is null) return NotFound();
+        if (await currentMemberService.FindMemberAsync(group.Id) is null) return NotFound();
+
+        return Ok(await eventMapper.MapGroupAsync(group));
     }
 
     [HttpPost]
@@ -50,6 +53,8 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
     [HttpGet("{id:guid}/members")]
     public async Task<ActionResult<List<MemberResponse>>> GetMembers(Guid id)
     {
+        if (await currentMemberService.FindMemberAsync(id) is null) return NotFound();
+
         var members = await db.Members
             .Where(m => m.GroupId == id && !m.IsGuest)
             .OrderBy(m => m.Name)

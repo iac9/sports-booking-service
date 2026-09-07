@@ -3,16 +3,20 @@ using Microsoft.EntityFrameworkCore;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
 using SportsBookingService.Api.Models;
+using SportsBookingService.Api.Services;
 
 namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups/{groupId:guid}/locations")]
-public class LocationsController(AppDbContext db) : ControllerBase
+public class LocationsController(AppDbContext db, CurrentMemberService currentMemberService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<LocationResponse>>> List(Guid groupId)
     {
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
+
         var locations = await db.Locations
             .Where(l => l.GroupId == groupId)
             .OrderBy(l => l.Name)
@@ -26,6 +30,8 @@ public class LocationsController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<LocationResponse>> Create(Guid groupId, CreateLocationRequest request)
     {
         if (!await db.Groups.AnyAsync(g => g.Id == groupId)) return NotFound();
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
 
         var location = new Location
         {
@@ -46,6 +52,8 @@ public class LocationsController(AppDbContext db) : ControllerBase
     {
         var location = await db.Locations.FirstOrDefaultAsync(l => l.Id == id && l.GroupId == groupId);
         if (location is null) return NotFound();
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
 
         if (request.Name is not null) location.Name = request.Name;
         if (request.Address is not null) location.Address = request.Address;
@@ -59,6 +67,8 @@ public class LocationsController(AppDbContext db) : ControllerBase
     {
         var location = await db.Locations.FirstOrDefaultAsync(l => l.Id == id && l.GroupId == groupId);
         if (location is null) return NotFound();
+        if (await currentMemberService.FindMemberAsync(groupId) is null)
+            return BadRequest(new { error = "Member not found in group." });
 
         db.Locations.Remove(location);
         await db.SaveChangesAsync();

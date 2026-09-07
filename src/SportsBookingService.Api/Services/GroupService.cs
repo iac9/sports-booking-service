@@ -139,6 +139,9 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         var group = await db.Groups.Include(g => g.Locations).FirstOrDefaultAsync(g => g.Id == groupId);
         if (group is null) return ServiceResult.Fail(ServiceErrorKind.NotFound);
 
+        var member = await currentMemberService.FindMemberAsync(groupId);
+        if (member is null) return ServiceResult.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
         if (request.LocationId is not null && !group.Locations.Any(l => l.Id == request.LocationId))
             return ServiceResult.Fail(ServiceErrorKind.BadRequest, "Location does not belong to this group.");
 

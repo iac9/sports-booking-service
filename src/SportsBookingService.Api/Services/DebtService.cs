@@ -12,6 +12,10 @@ public class DebtService(AppDbContext db, CostService costService, CurrentMember
         if (!await db.Groups.AnyAsync(g => g.Id == groupId))
             return ServiceResult<List<DebtResponse>>.Fail(ServiceErrorKind.NotFound);
 
+        var caller = await currentMemberService.FindMemberAsync(groupId);
+        if (caller is null)
+            return ServiceResult<List<DebtResponse>>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
         var events = await db.Events
             .Where(e => e.GroupId == groupId)
             .Include(e => e.Attendees).ThenInclude(a => a.Member)

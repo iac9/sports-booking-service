@@ -48,6 +48,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         if (ev is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.NotFound);
 
+        var member = await currentMemberService.FindMemberAsync(groupId);
+        if (member is null) return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
         if (request.Title is not null) ev.Title = request.Title;
         if (request.Date is not null) ev.Date = DateOnly.Parse(request.Date);
         if (request.LocationId is not null) ev.LocationId = request.LocationId;
@@ -74,6 +77,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
     {
         var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
         if (ev is null) return ServiceResult.Fail(ServiceErrorKind.NotFound);
+
+        var member = await currentMemberService.FindMemberAsync(groupId);
+        if (member is null) return ServiceResult.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
 
         db.Events.Remove(ev);
         await db.SaveChangesAsync();
@@ -223,6 +229,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
         if (ev is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.NotFound);
 
+        var caller = await currentMemberService.FindMemberAsync(groupId);
+        if (caller is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
         var paidBy = await db.Members.FirstOrDefaultAsync(m => m.Id == request.PaidByMemberId && m.GroupId == groupId);
         if (paidBy is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
 
@@ -252,6 +261,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
             .FirstOrDefaultAsync(e => e.Id == expenseId && e.EventId == id && e.Event.GroupId == groupId);
         if (expense is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.NotFound);
 
+        var caller = await currentMemberService.FindMemberAsync(groupId);
+        if (caller is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
         if (request.Description is not null) expense.Description = request.Description;
         if (request.Amount is not null) expense.Amount = request.Amount.Value;
         if (request.PaidByMemberId is not null)
@@ -275,6 +287,9 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
     {
         var expense = await db.Expenses.FirstOrDefaultAsync(e => e.Id == expenseId && e.EventId == id && e.Event.GroupId == groupId);
         if (expense is null) return ServiceResult.Fail(ServiceErrorKind.NotFound);
+
+        var caller = await currentMemberService.FindMemberAsync(groupId);
+        if (caller is null) return ServiceResult.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
 
         db.Expenses.Remove(expense);
         await db.SaveChangesAsync();
