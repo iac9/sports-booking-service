@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using SportsBookingService.Api.Auth;
 using SportsBookingService.Api.Data;
+using SportsBookingService.Api.Jobs;
 using SportsBookingService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -109,6 +110,7 @@ builder.Services.AddScoped<CurrentMemberService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<DebtService>();
+builder.Services.AddHostedService<EventRetentionCleanupService>();
 
 var app = builder.Build();
 
