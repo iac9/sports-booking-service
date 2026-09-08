@@ -66,6 +66,14 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connect
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Hosted on Render, whose edge proxy has no fixed/publishable IP to add to KnownProxies —
+    // the container's port is only reachable through Render's routing, never directly from the
+    // public internet, so the immediate connecting peer is always that edge. ForwardLimit stays
+    // at its default of 1 so only the single, closest hop is processed: Render appends to
+    // X-Forwarded-For rather than replacing it, so the rightmost entry is always the value Render
+    // itself observed, never something a client could prepend/spoof.
+    options.ForwardLimit = 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
