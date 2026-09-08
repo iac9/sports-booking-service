@@ -9,7 +9,7 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups")]
-public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService, CurrentMemberService currentMemberService) : ControllerBase
+public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService, CurrentMemberService currentMemberService, ILogger<GroupsController> logger) : ControllerBase
 {
     [HttpGet("code/{code}")]
     [EnableRateLimiting("GroupLookup")]
@@ -18,7 +18,11 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
         var group = await EventMapper.IncludeGroupFullGraph(db.Groups)
             .FirstOrDefaultAsync(g => g.Code == code.ToUpperInvariant());
 
-        if (group is null) return NotFound();
+        if (group is null)
+        {
+            logger.LogWarning("Failed group lookup: no group found for code {Code}", code);
+            return NotFound();
+        }
         if (await currentMemberService.FindMemberAsync(group.Id) is null) return NotFound();
 
         return Ok(await eventMapper.MapGroupAsync(group));

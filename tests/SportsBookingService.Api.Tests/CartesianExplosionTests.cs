@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
 using SportsBookingService.Api.Models;
@@ -52,7 +53,7 @@ public class CartesianExplosionTests : IDisposable
                 User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", clerkUserId)])),
             },
         };
-        var currentMemberService = new CurrentMemberService(httpContextAccessor, db);
+        var currentMemberService = new CurrentMemberService(httpContextAccessor, db, NullLogger<CurrentMemberService>.Instance);
         var eventMapper = new EventMapper(db, new CostService(), currentMemberService);
         return new EventService(db, eventMapper, currentMemberService);
     }
@@ -96,7 +97,7 @@ public class CartesianExplosionTests : IDisposable
 
         using var verifyDb = NewContext();
         var eventMapper = new EventMapper(verifyDb, new CostService(),
-            new CurrentMemberService(new HttpContextAccessor(), verifyDb));
+            new CurrentMemberService(new HttpContextAccessor(), verifyDb, NullLogger<CurrentMemberService>.Instance));
         var loaded = await eventMapper.LoadEvent(groupId, eventId);
         Assert.NotNull(loaded);
 

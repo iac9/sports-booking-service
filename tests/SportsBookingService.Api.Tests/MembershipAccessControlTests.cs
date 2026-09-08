@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SportsBookingService.Api.Controllers;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
@@ -56,7 +57,7 @@ public class MembershipAccessControlTests : IDisposable
                 User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", clerkUserId)])),
             },
         };
-        return new CurrentMemberService(httpContextAccessor, db);
+        return new CurrentMemberService(httpContextAccessor, db, NullLogger<CurrentMemberService>.Instance);
     }
 
     private EventService NewEventService(AppDbContext db, string clerkUserId)
@@ -70,8 +71,8 @@ public class MembershipAccessControlTests : IDisposable
     {
         var currentMemberService = NewCurrentMemberService(db, clerkUserId);
         var eventMapper = new EventMapper(db, new CostService(), currentMemberService);
-        var groupService = new GroupService(db, eventMapper, currentMemberService);
-        return new GroupsController(db, eventMapper, groupService, currentMemberService);
+        var groupService = new GroupService(db, eventMapper, currentMemberService, NullLogger<GroupService>.Instance);
+        return new GroupsController(db, eventMapper, groupService, currentMemberService, NullLogger<GroupsController>.Instance);
     }
 
     private LocationsController NewLocationsController(AppDbContext db, string clerkUserId) =>
@@ -140,7 +141,7 @@ public class MembershipAccessControlTests : IDisposable
         using var db = NewContext();
         var currentMemberService = NewCurrentMemberService(db, MalloryClerkId);
         var eventMapper = new EventMapper(db, new CostService(), currentMemberService);
-        var groupService = new GroupService(db, eventMapper, currentMemberService);
+        var groupService = new GroupService(db, eventMapper, currentMemberService, NullLogger<GroupService>.Instance);
 
         var result = await groupService.SetPrimaryLocationAsync(groupId, new SetPrimaryLocationRequest(null));
 

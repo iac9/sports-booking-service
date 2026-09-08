@@ -5,7 +5,7 @@ using SportsBookingService.Api.Models;
 
 namespace SportsBookingService.Api.Services;
 
-public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMemberService currentMemberService)
+public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMemberService currentMemberService, ILogger<GroupService> logger)
 {
     public async Task<GroupResponse> CreateAsync(CreateGroupRequest request)
     {
@@ -36,6 +36,7 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         group.Name = request.Name;
         await db.SaveChangesAsync();
+        logger.LogInformation("Group {GroupId} renamed to {Name} by member {MemberId}", groupId, request.Name, member.Id);
         return ServiceResult<GroupResponse>.Success(await eventMapper.MapGroupAsync(group));
     }
 
@@ -52,6 +53,7 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         group.AdminMemberId = request.MemberId;
         await db.SaveChangesAsync();
+        logger.LogInformation("Group {GroupId} admin transferred from {FromMemberId} to {ToMemberId}", groupId, member.Id, request.MemberId);
         return ServiceResult<GroupResponse>.Success(await eventMapper.MapGroupAsync(group));
     }
 
@@ -76,6 +78,7 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
+        logger.LogInformation("Group {GroupId} deleted by member {MemberId}", groupId, member.Id);
         return ServiceResult.Success();
     }
 
@@ -113,7 +116,11 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
             .Select(g => (Guid?)g.Id)
             .FirstOrDefaultAsync();
 
-        if (groupId is null) return null;
+        if (groupId is null)
+        {
+            logger.LogWarning("Failed join attempt: no group found for code {Code}", request.Code);
+            return null;
+        }
 
         var clerkUserId = currentMemberService.GetClerkUserId();
         var alreadyMember = await db.Members.AnyAsync(m => m.GroupId == groupId && m.ClerkUserId == clerkUserId);

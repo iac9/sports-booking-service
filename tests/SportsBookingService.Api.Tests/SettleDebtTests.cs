@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
 using SportsBookingService.Api.Models;
@@ -50,7 +51,7 @@ public class SettleDebtTests : IDisposable
                 User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", clerkUserId)])),
             },
         };
-        return new CurrentMemberService(httpContextAccessor, db);
+        return new CurrentMemberService(httpContextAccessor, db, NullLogger<CurrentMemberService>.Instance);
     }
 
     private EventService NewEventService(AppDbContext db, string clerkUserId)
