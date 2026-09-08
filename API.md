@@ -9,7 +9,9 @@ shape changes, update this file in the same change.
 - **Auth**: every endpoint except `GET /health` and `GET /health/db` requires `Authorization: Bearer <token>`,
   where `<token>` is a Clerk session JWT. The token is verified server-side against Clerk's
   JWKS (`{Clerk:FrontendApiUrl}/.well-known/jwks.json`); requests with a missing or invalid
-  token get `401`. The token's `sub` claim is the caller's durable Clerk user id, stored on
+  token get `401`, as do tokens whose `azp` claim doesn't match one of the known frontend
+  origins (`http://localhost:5173`, `https://sports-booking-ui.vercel.app`). The token's `sub`
+  claim is the caller's durable Clerk user id, stored on
   `Members.ClerkUserId`. `Members.Id` is a server-generated `Guid` — a person gets a fresh
   `Member` row (and `Id`) per group they join, unified across groups only via `ClerkUserId`.
   Endpoints that used to accept a client-supplied id for "who is acting" (creating a group,

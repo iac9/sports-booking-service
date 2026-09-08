@@ -22,6 +22,13 @@ var clerkFrontendApiUrl = builder.Configuration["Clerk:FrontendApiUrl"]
     ?? throw new InvalidOperationException("Configuration 'Clerk:FrontendApiUrl' is not set.");
 var clerkJwksAddress = $"{clerkFrontendApiUrl}/.well-known/jwks.json";
 
+// Clerk's default session tokens carry no `aud` claim (that requires a dashboard-configured
+// JWT template), so audience validation stays off. Instead we validate the `azp` claim Clerk
+// does include by default, per Clerk's own recommendation, against the same origins CORS
+// already trusts — this achieves the equivalent protection (reject tokens minted for a
+// different frontend) without needing any external Clerk dashboard configuration.
+var allowedFrontendOrigins = new[] { "http://localhost:5173", "https://sports-booking-ui.vercel.app" };
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -35,6 +42,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidIssuer = clerkFrontendApiUrl,
             ValidateAudience = false,
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var azp = context.Principal?.FindFirst("azp")?.Value;
+                if (azp is not null && !allowedFrontendOrigins.Contains(azp))
+                {
+                    context.Fail("Token was not issued for an authorized origin.");
+                }
+                return Task.CompletedTask;
+            },
         };
     });
 builder.Services.AddAuthorization();
@@ -80,7 +99,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins("http://localhost:5173", "https://sports-booking-ui.vercel.app")
+        policy.WithOrigins(allowedFrontendOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()));
 
