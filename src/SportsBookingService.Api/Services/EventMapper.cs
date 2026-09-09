@@ -59,7 +59,7 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             group.Code,
             group.Members.Where(m => !m.IsGuest).Select(m => new MemberResponse(m.Id, m.Name)).ToList(),
             group.Events.OrderBy(e => e.Date).Select(MapDetail).ToList(),
-            group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address)).ToList(),
+            group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address, l.WebsiteUrl)).ToList(),
             group.PrimaryLocationId,
             currentMember?.Id,
             group.AdminMemberId

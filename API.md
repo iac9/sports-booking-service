@@ -58,8 +58,8 @@ All endpoints below require the caller to be a member of `groupId` (`400` if not
 | Endpoint | Description | Request Body | Response |
 |---|---|---|---|
 | `GET /` | List a group's locations, ordered by name. | — | `200` → `LocationResponse[]` |
-| `POST /` | Add a location to a group. | `{ Name: string, Address: string }` | `201 Created` → `LocationResponse` · `404` if group not found |
-| `PATCH /{id}` | Partially update a location — only supplied fields are changed. | `{ Name?: string, Address?: string }` | `200` → `LocationResponse` · `404` if location not found in group |
+| `POST /` | Add a location to a group. | `{ Name: string, Address: string, WebsiteUrl?: string }` | `201 Created` → `LocationResponse` · `404` if group not found |
+| `PATCH /{id}` | Partially update a location — only supplied fields are changed. | `{ Name?: string, Address?: string, WebsiteUrl?: string }` | `200` → `LocationResponse` · `404` if location not found in group |
 | `DELETE /{id}` | Delete a location. | — | `204` · `404` if location not found in group |
 
 ## Events
@@ -105,7 +105,7 @@ MemberResponse       { Id: guid, Name: string, IsGuest: bool, AddedByMemberId: g
                      // IsGuest/AddedByMemberId are only ever true/set on entries inside an
                      // event's Attendees/Waitlist — guests are excluded from GroupResponse.Members
                      // and GET /api/groups/{id}/members entirely.
-LocationResponse     { Id: guid, Name: string, Address: string }
+LocationResponse     { Id: guid, Name: string, Address: string, WebsiteUrl: string? }
 CourtBookingResponse { Id: guid, Court: string, StartTime: string, EndTime: string }
 BalanceResponse      { Member: MemberResponse, Balance: decimal }
 CostBreakdownResponse { TotalCost: decimal, CostPerAttendee: decimal, Balances: BalanceResponse[] }

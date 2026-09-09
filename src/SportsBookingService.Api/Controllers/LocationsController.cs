@@ -20,7 +20,7 @@ public class LocationsController(AppDbContext db, CurrentMemberService currentMe
         var locations = await db.Locations
             .Where(l => l.GroupId == groupId)
             .OrderBy(l => l.Name)
-            .Select(l => new LocationResponse(l.Id, l.Name, l.Address))
+            .Select(l => new LocationResponse(l.Id, l.Name, l.Address, l.WebsiteUrl))
             .ToListAsync();
 
         return Ok(locations);
@@ -38,12 +38,13 @@ public class LocationsController(AppDbContext db, CurrentMemberService currentMe
             Id = Guid.NewGuid(),
             Name = request.Name,
             Address = request.Address,
+            WebsiteUrl = request.WebsiteUrl,
             GroupId = groupId,
         };
         db.Locations.Add(location);
         await db.SaveChangesAsync();
 
-        var response = new LocationResponse(location.Id, location.Name, location.Address);
+        var response = new LocationResponse(location.Id, location.Name, location.Address, location.WebsiteUrl);
         return CreatedAtAction(nameof(List), new { groupId }, response);
     }
 
@@ -57,9 +58,10 @@ public class LocationsController(AppDbContext db, CurrentMemberService currentMe
 
         if (request.Name is not null) location.Name = request.Name;
         if (request.Address is not null) location.Address = request.Address;
+        if (request.WebsiteUrl is not null) location.WebsiteUrl = request.WebsiteUrl;
         await db.SaveChangesAsync();
 
-        return Ok(new LocationResponse(location.Id, location.Name, location.Address));
+        return Ok(new LocationResponse(location.Id, location.Name, location.Address, location.WebsiteUrl));
     }
 
     [HttpDelete("{id:guid}")]

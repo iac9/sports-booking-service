@@ -21,7 +21,7 @@ public record GroupSummaryResponse(
     int MemberCount
 );
 
-public record LocationResponse(Guid Id, string Name, string Address);
+public record LocationResponse(Guid Id, string Name, string Address, string? WebsiteUrl);
 
 public record CourtBookingResponse(Guid Id, string Court, string StartTime, string EndTime);
 
