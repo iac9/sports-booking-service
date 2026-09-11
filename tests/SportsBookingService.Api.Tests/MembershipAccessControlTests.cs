@@ -72,7 +72,8 @@ public class MembershipAccessControlTests : IDisposable
         var currentMemberService = NewCurrentMemberService(db, clerkUserId);
         var eventMapper = new EventMapper(db, new CostService(), currentMemberService);
         var groupService = new GroupService(db, eventMapper, currentMemberService, NullLogger<GroupService>.Instance);
-        return new GroupsController(db, eventMapper, groupService, currentMemberService, NullLogger<GroupsController>.Instance);
+        return new GroupsController(db, eventMapper, groupService, TestServices.NewPendingBookingService(db, currentMemberService),
+            currentMemberService, TestServices.EmptyConfiguration, NullLogger<GroupsController>.Instance);
     }
 
     private LocationsController NewLocationsController(AppDbContext db, string clerkUserId) =>

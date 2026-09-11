@@ -148,6 +148,9 @@ namespace SportsBookingService.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("InboundEmailToken")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -160,6 +163,9 @@ namespace SportsBookingService.Api.Migrations
                     b.HasIndex("AdminMemberId");
 
                     b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("InboundEmailToken")
                         .IsUnique();
 
                     b.ToTable("Groups");
@@ -221,6 +227,99 @@ namespace SportsBookingService.Api.Migrations
                         .HasFilter("\"ClerkUserId\" IS NOT NULL");
 
                     b.ToTable("Members");
+                });
+
+            modelBuilder.Entity("SportsBookingService.Api.Models.PendingBooking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ExtractedCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ExtractedCurrency")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("ExtractedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ExtractedEndTime")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExtractedRawJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExtractedStartTime")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExtractedVenueName")
+                        .HasColumnType("text");
+
+                    b.Property<double?>("ExtractionConfidence")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ExtractionError")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MatchedEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MatchedLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderHint")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RawEmailFrom")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RawEmailHtml")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RawEmailSubject")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RawEmailText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByMemberId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedEventId");
+
+                    b.HasIndex("MatchedEventId");
+
+                    b.HasIndex("MatchedLocationId");
+
+                    b.HasIndex("ReviewedByMemberId");
+
+                    b.HasIndex("GroupId", "Status");
+
+                    b.ToTable("PendingBookings");
                 });
 
             modelBuilder.Entity("SportsBookingService.Api.Models.Settlement", b =>
@@ -380,6 +479,45 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Group");
                 });
 
+            modelBuilder.Entity("SportsBookingService.Api.Models.PendingBooking", b =>
+                {
+                    b.HasOne("SportsBookingService.Api.Models.Event", "CreatedEvent")
+                        .WithMany()
+                        .HasForeignKey("CreatedEventId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SportsBookingService.Api.Models.Group", "Group")
+                        .WithMany("PendingBookings")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SportsBookingService.Api.Models.Event", "MatchedEvent")
+                        .WithMany()
+                        .HasForeignKey("MatchedEventId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SportsBookingService.Api.Models.Location", "MatchedLocation")
+                        .WithMany()
+                        .HasForeignKey("MatchedLocationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SportsBookingService.Api.Models.Member", "ReviewedByMember")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByMemberId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedEvent");
+
+                    b.Navigation("Group");
+
+                    b.Navigation("MatchedEvent");
+
+                    b.Navigation("MatchedLocation");
+
+                    b.Navigation("ReviewedByMember");
+                });
+
             modelBuilder.Entity("SportsBookingService.Api.Models.Settlement", b =>
                 {
                     b.HasOne("SportsBookingService.Api.Models.Event", "Event")
@@ -446,6 +584,8 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Locations");
 
                     b.Navigation("Members");
+
+                    b.Navigation("PendingBookings");
                 });
 #pragma warning restore 612, 618
         }

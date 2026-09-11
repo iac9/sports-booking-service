@@ -9,7 +9,14 @@ namespace SportsBookingService.Api.Controllers;
 
 [ApiController]
 [Route("api/groups")]
-public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupService groupService, CurrentMemberService currentMemberService, ILogger<GroupsController> logger) : ControllerBase
+public class GroupsController(
+    AppDbContext db,
+    EventMapper eventMapper,
+    GroupService groupService,
+    PendingBookingService pendingBookingService,
+    CurrentMemberService currentMemberService,
+    IConfiguration configuration,
+    ILogger<GroupsController> logger) : ControllerBase
 {
     [HttpGet("code/{code}")]
     [EnableRateLimiting("GroupLookup")]
@@ -81,6 +88,18 @@ public class GroupsController(AppDbContext db, EventMapper eventMapper, GroupSer
     [EnableRateLimiting("GroupLookup")]
     public async Task<ActionResult<GroupResponse?>> JoinByCode(JoinGroupByCodeRequest request) =>
         Ok(await groupService.JoinByCodeAsync(request));
+
+    /// <summary>
+    /// The group's inbound booking-email address — what members point their one-time
+    /// auto-forward rule at. Every group shares one real mailbox and is told apart by the
+    /// plus-address token.
+    /// </summary>
+    [HttpGet("{id:guid}/inbound-email")]
+    public async Task<ActionResult<InboundEmailAddressResponse>> GetInboundEmail(Guid id)
+    {
+        var result = await pendingBookingService.GetInboundAddressAsync(id, configuration["Email:InboundAddress"]);
+        return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
+    }
 
     [HttpPut("{id:guid}/primary-location")]
     public async Task<IActionResult> SetPrimaryLocation(Guid id, SetPrimaryLocationRequest request)

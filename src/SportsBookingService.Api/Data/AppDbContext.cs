@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Settlement> Settlements => Set<Settlement>();
+    public DbSet<PendingBooking> PendingBookings => Set<PendingBooking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(g => g.Code)
             .IsUnique();
 
+        modelBuilder.Entity<Group>()
+            .HasIndex(g => g.InboundEmailToken)
+            .IsUnique();
+
         modelBuilder.Entity<Member>()
             .HasIndex(m => new { m.GroupId, m.ClerkUserId })
             .IsUnique()
@@ -62,5 +67,40 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Settlement>()
             .HasIndex(s => new { s.EventId, s.FromMemberId, s.ToMemberId })
             .IsUnique();
+
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.Group)
+            .WithMany(g => g.PendingBookings)
+            .HasForeignKey(p => p.GroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // A deleted location/event must not take the review-queue row with it — the raw email
+        // is still worth showing, just without the match.
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.MatchedLocation)
+            .WithMany()
+            .HasForeignKey(p => p.MatchedLocationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.MatchedEvent)
+            .WithMany()
+            .HasForeignKey(p => p.MatchedEventId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.CreatedEvent)
+            .WithMany()
+            .HasForeignKey(p => p.CreatedEventId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.ReviewedByMember)
+            .WithMany()
+            .HasForeignKey(p => p.ReviewedByMemberId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PendingBooking>()
+            .HasIndex(p => new { p.GroupId, p.Status });
     }
 }

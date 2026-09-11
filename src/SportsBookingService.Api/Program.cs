@@ -110,6 +110,16 @@ builder.Services.AddScoped<CurrentMemberService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<DebtService>();
+builder.Services.AddScoped<EmailIngestionService>();
+builder.Services.AddScoped<PendingBookingService>();
+builder.Services.AddScoped<InboundEmailWebhookAuthFilter>();
+
+// Typed client rather than a bare `new HttpClient()`, so socket handlers are pooled and the
+// timeout is enforced by the client itself — the inbound webhook awaits this call inline, and
+// a hanging Gemini response must not hold the request open.
+builder.Services.AddHttpClient<GeminiBookingExtractionService>(c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddScoped<IBookingExtractionService>(sp => sp.GetRequiredService<GeminiBookingExtractionService>());
+
 builder.Services.AddHostedService<EventRetentionCleanupService>();
 
 var app = builder.Build();

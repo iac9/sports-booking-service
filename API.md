@@ -6,7 +6,8 @@ shape changes, update this file in the same change.
 
 ## Conventions
 
-- **Auth**: every endpoint except `GET /health` and `GET /health/db` requires `Authorization: Bearer <token>`,
+- **Auth**: every endpoint except `GET /health`, `GET /health/db`, and `POST /api/webhooks/email`
+  requires `Authorization: Bearer <token>`,
   where `<token>` is a Clerk session JWT. The token is verified server-side against Clerk's
   JWKS (`{Clerk:FrontendApiUrl}/.well-known/jwks.json`); requests with a missing or invalid
   token get `401`, as do tokens whose `azp` claim doesn't match one of the known frontend
@@ -18,7 +19,9 @@ shape changes, update this file in the same change.
   joining, leaving, RSVPing) now resolve the acting member server-side
   from the verified token instead. `AddExpense`'s `PaidByMemberId` is the exception — it names
   an arbitrary existing group member ("who paid"), not necessarily the caller, so it's still
-  client-supplied.
+  client-supplied. `POST /api/webhooks/email` is the one endpoint outside Clerk JWT auth
+  entirely — a mail provider can't hold a user session — and uses HTTP Basic auth against the
+  `Email:WebhookUsername`/`Email:WebhookPassword` credentials instead. See [Webhooks](#webhooks).
 - **JSON casing**: request and response bodies use `camelCase` field names (ASP.NET Core's
   default `System.Text.Json` naming policy). The tables below use the C# record property
   names (PascalCase); translate to `camelCase` on the wire (e.g. `CreatorName` → `creatorName`).
@@ -47,6 +50,7 @@ shape changes, update this file in the same change.
 | `DELETE /api/groups/{id}/members/me` | Remove the caller from a group (leave-group). If the caller is the group's admin and is the sole member, the entire group (and all its data) is deleted instead. | — | `204` · `404` if caller isn't a member of the group · `409` if the caller is the group's admin and other members remain (must transfer the admin role first, via `PUT /api/groups/{id}/admin`) |
 | `PUT /api/groups/{id}/admin` | Transfer the group's admin role to another member. Admin-only. | `{ MemberId: guid }` | `200` → `GroupResponse` · `404` if group not found · `403` if caller isn't the group's admin · `400` if `MemberId` isn't a member of this group |
 | `POST /api/groups/join` | Join a group by its join code, as the caller. Idempotent — if the caller already belongs, no change is made. Rate-limited to 20 requests/minute per caller — `429` if exceeded. | `Code` string<br>`MemberName` string | `200` → `GroupResponse` if the code matched, or `null` if no group has that code (never 404 — a missing code is a normal outcome the client checks for) · `429` if rate-limited |
+| `GET /api/groups/{id}/inbound-email` | The group's booking-email forwarding address — what members point their one-time auto-forward rule at. Every group shares one real mailbox, distinguished by a 12-char `[a-z0-9]` plus-address token: `{localpart}+{token}@{domain}`, derived from the `Email:InboundAddress` setting. Caller must be a member. | — | `200` → `InboundEmailAddressResponse` · `404` if group not found, or inbound email isn't configured on the server · `400` if caller isn't a member |
 | `PUT /api/groups/{id}/primary-location` | Set (or clear) the group's default/primary location. Caller must be a member. | `{ LocationId: guid \| null }` | `204` · `404` if group not found · `400` if caller isn't a member, or `LocationId` is supplied but isn't one of the group's locations |
 
 ## Locations
@@ -89,6 +93,31 @@ Base path: `/api/groups/{groupId}/members/{memberId}`
 |---|---|---|---|
 | `GET /debts-owed` | List every unsettled debt owed *to* `memberId`, one row per event per debtor, computed by running the debt-simplification algorithm (greedy largest-creditor/largest-debtor matching) over each event's `CostBreakdown.Balances`. Ordered by event date descending. Settling a debt (see below) removes it from this list permanently — settled debts are excluded, not flagged. Caller must be a member of the group — not necessarily `memberId` itself, since balances are already visible group-wide. | — | `200` → `DebtResponse[]` · `404` if group not found · `400` if caller isn't a member of the group |
 | `POST /debts-owed/settle` | Mark a debt as settled — only `memberId` (the caller, resolved from the token) may settle a debt owed to them; `403` otherwise. The settled `Amount` is always computed server-side from the current cost breakdown (the same debt-simplification run as `GET /debts-owed`) — the client does not, and cannot, supply it. Once settled, the debt is excluded from future `GET /debts-owed` calls for good, on both sides of the transaction. Idempotent — settling an already-settled `(EventId, FromMemberId)` pair returns the existing settlement unchanged. | `EventId` guid<br>`FromMemberId` guid | `200` → `DebtResponse` · `404` if group, event, or `FromMemberId` not found · `400` if caller isn't a member of the group, or there's no outstanding debt between the caller and `FromMemberId` for this event · `403` if caller isn't `memberId` |
+
+## Webhooks
+
+| Endpoint | Description | Request Body | Response |
+|---|---|---|---|
+| `POST /api/webhooks/email` | Receive a forwarded booking-confirmation email. **The one endpoint outside Clerk JWT auth** — authenticated with HTTP Basic instead (CloudMailin sends credentials embedded in its configured target URL). The group is identified by the 12-char plus-address token on `envelope.to`. The raw email is persisted as a `PendingBooking` *before* extraction runs, so a failed parse never loses it; extraction then fills in the `Extracted*` fields and pre-matches a `Location`/`Event`. On any extraction failure the row is saved with `Status: "Failed"` and an `ExtractionError` for manual entry. **Always returns `200`**, even on internal failure — CloudMailin reads non-2xx as a bounce/retry signal, and replaying the same email would just fail identically. Nothing is created automatically: the row only becomes a real `Event` when a member confirms it below. | `CloudMailinInboundWebhookPayload` (see [Webhook payload](#webhook-payload)) | `200` (empty body), always · `401` if Basic credentials are missing or wrong |
+
+An unrecognised or malformed recipient token is dropped silently with a `200` and no row created —
+the token is the only spam gate, and confirming to a sender whether a token exists would weaken it.
+
+## Pending Bookings
+
+Base path: `/api/groups/{groupId}/pending-bookings`
+
+The review queue for emails ingested by the webhook above. All endpoints require the caller to
+be a member of `groupId` (`400` if not).
+
+| Endpoint | Description | Request Body | Response |
+|---|---|---|---|
+| `GET /` | List the group's pending bookings, newest received first. Includes reviewed rows (`Confirmed`/`Dismissed`), so the UI can show what happened to them. | — | `200` → `PendingBookingResponse[]` · `404` if group not found |
+| `POST /{id}/confirm` | Turn a reviewed booking into a real `Event`, via the same creation path as `POST /api/groups/{groupId}/events` — the client supplies the final (possibly edited) values, not the extracted ones. Supplying `ExpenseAmount` also records an `Expense` paid by the caller, defaulting to the description `"Court booking"`. Marks the row `Confirmed` with `CreatedEventId`/`ReviewedByMemberId`/`ReviewedAt`. | `Title` string<br>`Date` string (`yyyy-MM-dd`)<br>`LocationId` guid?<br>`MaxAttendees` int?<br>`CourtBookings` `CreateCourtBookingRequest[]`<br>`ExpenseAmount` decimal?<br>`ExpenseDescription` string? | `200` → `EventDetailResponse` · `404` if group or booking not found · `409` if the booking was already confirmed or dismissed |
+| `POST /{id}/dismiss` | Mark a booking `Dismissed` without creating anything. | — | `204` · `404` if group or booking not found · `409` if already confirmed or dismissed |
+
+Only `Pending` and `Failed` rows can be confirmed or dismissed — a `Failed` row is confirmable
+precisely because manual entry is its intended path.
 
 ## Health
 
@@ -142,5 +171,40 @@ GroupResponse {
 GroupSummaryResponse {
   Id: guid, Name: string, Code: string,
   MemberCount: int
+}
+
+InboundEmailAddressResponse { Address: string }
+
+PendingBookingResponse {
+  Id: guid,
+  Status: string,             // "Pending" | "Confirmed" | "Dismissed" | "Failed"
+  RawEmailFrom: string, RawEmailSubject: string, RawEmailText: string,
+  ReceivedAt: string,         // round-trip ("o") ISO 8601
+  ProviderHint: string?,      // sender's domain, e.g. "yepbooking.com"
+  ExtractedVenueName: string?,
+  ExtractedDate: string?,     // yyyy-MM-dd
+  ExtractedStartTime: string?, ExtractedEndTime: string?,   // 24-hour HH:mm
+  ExtractedCost: decimal?, ExtractedCurrency: string?,
+  ExtractionConfidence: double?,  // 1.0 = every field found; lower = partial. Informational
+                                  // only — pre-fills the review form, never auto-creates.
+  ExtractionError: string?,   // set when Status is "Failed"
+  MatchedLocationId: guid?,   // best-guess existing Location, pre-selects the dropdown
+  MatchedEventId: guid?,      // an existing Event on the same date/location, if any
+  CreatedEventId: guid?,      // set once Confirmed
+  ReviewedByMemberId: guid?, ReviewedAt: string?
+}
+```
+
+### Webhook payload
+
+CloudMailin's JSON POST format. Only the fields the service reads are listed; CloudMailin sends
+more (attachments, spam scores, `reply_plain`), which is ignored.
+
+```
+CloudMailinInboundWebhookPayload {
+  Envelope: { To: string?, From: string?, Recipients: string[]? },
+  Headers:  { From: string?, Subject: string? },
+  Plain: string?,   // the plain-text body — this is what extraction reads
+  Html: string?
 }
 ```

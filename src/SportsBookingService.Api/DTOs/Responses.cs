@@ -74,3 +74,28 @@ public record EventDetailResponse(
     MemberResponse CreatedBy,
     CostBreakdownResponse CostBreakdown
 );
+
+public record PendingBookingResponse(
+    Guid Id,
+    string Status,
+    string RawEmailFrom,
+    string RawEmailSubject,
+    string RawEmailText,
+    string ReceivedAt,
+    string? ProviderHint,
+    string? ExtractedVenueName,
+    string? ExtractedDate,
+    string? ExtractedStartTime,
+    string? ExtractedEndTime,
+    decimal? ExtractedCost,
+    string? ExtractedCurrency,
+    double? ExtractionConfidence,
+    string? ExtractionError,
+    Guid? MatchedLocationId,
+    Guid? MatchedEventId,
+    Guid? CreatedEventId,
+    Guid? ReviewedByMemberId,
+    string? ReviewedAt
+);
+
+public record InboundEmailAddressResponse(string Address);

@@ -14,6 +14,7 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
             Id = Guid.NewGuid(),
             Name = request.Name,
             Code = GenerateCode(),
+            InboundEmailToken = GenerateInboundToken(),
         };
 
         var creator = new Member { Id = Guid.NewGuid(), Name = request.CreatorName, GroupId = group.Id, ClerkUserId = currentMemberService.GetClerkUserId() };
@@ -161,6 +162,20 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         return new string(Enumerable.Range(0, 6)
+            .Select(_ => chars[Random.Shared.Next(chars.Length)])
+            .ToArray());
+    }
+
+    /// <summary>
+    /// The plus-address suffix identifying a group on the shared inbound mailbox. Longer and
+    /// lowercase-only compared to <see cref="GenerateCode"/>: this token is never typed by
+    /// hand, and it's the only thing standing between the webhook and junk mail, so it trades
+    /// share-friendliness for entropy (36^12 rather than 36^6).
+    /// </summary>
+    public static string GenerateInboundToken()
+    {
+        const string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        return new string(Enumerable.Range(0, 12)
             .Select(_ => chars[Random.Shared.Next(chars.Length)])
             .ToArray());
     }

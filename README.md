@@ -16,10 +16,11 @@ See [`API.md`](API.md) for the full endpoint reference — it's the canonical so
 
 ```
 src/SportsBookingService.Api/
-  Controllers/   REST endpoints (Groups, Locations, Events, Users)
+  Controllers/   REST endpoints (Groups, Locations, Events, Users, Pending Bookings, Webhooks)
+  Auth/          Clerk JWKS retrieval, inbound-email webhook Basic auth
   Models/        EF Core entities
   DTOs/          Request/response records
-  Services/      CostService (cost splitting), EventMapper
+  Services/      CostService (cost splitting), EventMapper, email ingestion + booking extraction
   Data/          AppDbContext
   Migrations/    EF Core migrations
 tests/SportsBookingService.Api.Tests/
@@ -58,6 +59,34 @@ Free-tier Neon projects scale to zero after a period of inactivity; the next req
 3. In development, OpenAPI docs are available via Scalar at `/scalar`.
 
 The API allows CORS from `http://localhost:5173` (the UI's dev server) and `https://sports-booking-ui.vercel.app`.
+
+### Email ingestion setup (optional)
+
+Booking-confirmation emails members auto-forward to the app land on `POST /api/webhooks/email`
+and become rows in the review queue. Both services it depends on are free:
+
+1. **[CloudMailin](https://www.cloudmailin.com)** (free plan: 10,000 inbound emails/month, no
+   domain purchase needed) — create a target pointing at
+   `https://<your-host>/api/webhooks/email` with Basic Auth credentials embedded in the URL,
+   then copy the address it generates into `Email:InboundAddress`.
+2. **[Google AI Studio](https://ai.google.dev)** — generate a free Gemini API key (no card
+   required) for `Gemini:ApiKey`.
+
+```bash
+dotnet user-secrets set "Email:WebhookUsername" "<username>" --project src/SportsBookingService.Api
+dotnet user-secrets set "Email:WebhookPassword" "<password>" --project src/SportsBookingService.Api
+dotnet user-secrets set "Email:InboundAddress" "<yourhash>@cloudmailin.net" --project src/SportsBookingService.Api
+dotnet user-secrets set "Gemini:ApiKey" "<key>" --project src/SportsBookingService.Api
+```
+
+In production these are environment variables using the `Section__Key` convention
+(`Email__WebhookUsername`, `Gemini__ApiKey`, …). `Gemini:Model` defaults to
+`gemini-flash-lite-latest` in `appsettings.json` and can be overridden per environment.
+
+Without this configuration the rest of the API works normally; only the webhook and the
+Settings page's forwarding address are unavailable. You can exercise the webhook locally with
+placeholder credentials and no CloudMailin account — see [CLAUDE.md](CLAUDE.md) for a ready-made
+`curl` command.
 
 ## Testing
 
