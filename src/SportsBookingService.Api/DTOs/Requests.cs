@@ -59,11 +59,11 @@ public record SettleDebtRequest(Guid EventId, Guid FromMemberId);
 public record CreateLocationRequest(
     [Required, StringLength(100, MinimumLength = 1)] string Name,
     [Required, StringLength(300, MinimumLength = 1)] string Address,
-    [Url, StringLength(2048)] string? WebsiteUrl
+    [RegularExpression(@"^https?://\S+$", ErrorMessage = "Website URL must start with http:// or https://"), StringLength(2048)] string? WebsiteUrl
 );
 
 public record UpdateLocationRequest(
     [StringLength(100, MinimumLength = 1)] string? Name,
     [StringLength(300, MinimumLength = 1)] string? Address,
-    [Url, StringLength(2048)] string? WebsiteUrl
+    [RegularExpression(@"^https?://\S+$", ErrorMessage = "Website URL must start with http:// or https://"), StringLength(2048)] string? WebsiteUrl
 );

@@ -164,7 +164,7 @@ public class MembershipAccessControlTests : IDisposable
     public async Task Locations_Create_NonMember_ReturnsBadRequest()
     {
         using var db = NewContext();
-        var result = await NewLocationsController(db, MalloryClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St"));
+        var result = await NewLocationsController(db, MalloryClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St", null));
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -174,12 +174,12 @@ public class MembershipAccessControlTests : IDisposable
         Guid locationId;
         using (var db = NewContext())
         {
-            var created = await NewLocationsController(db, AliceClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St"));
+            var created = await NewLocationsController(db, AliceClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St", null));
             locationId = ((LocationResponse)((CreatedAtActionResult)created.Result!).Value!).Id;
         }
 
         using var db2 = NewContext();
-        var result = await NewLocationsController(db2, MalloryClerkId).Update(groupId, locationId, new UpdateLocationRequest("Court B", null));
+        var result = await NewLocationsController(db2, MalloryClerkId).Update(groupId, locationId, new UpdateLocationRequest("Court B", null, null));
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
@@ -189,7 +189,7 @@ public class MembershipAccessControlTests : IDisposable
         Guid locationId;
         using (var db = NewContext())
         {
-            var created = await NewLocationsController(db, AliceClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St"));
+            var created = await NewLocationsController(db, AliceClerkId).Create(groupId, new CreateLocationRequest("Court A", "123 Main St", null));
             locationId = ((LocationResponse)((CreatedAtActionResult)created.Result!).Value!).Id;
         }
 
