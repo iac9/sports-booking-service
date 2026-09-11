@@ -67,8 +67,10 @@ and become rows in the review queue. Both services it depends on are free:
 
 1. **[CloudMailin](https://www.cloudmailin.com)** (free plan: 10,000 inbound emails/month, no
    domain purchase needed) — create a target pointing at
-   `https://<your-host>/api/webhooks/email` with Basic Auth credentials embedded in the URL,
-   then copy the address it generates into `Email:InboundAddress`.
+   `https://<your-host>/api/webhooks/email`, format **JSON (Normalized)**. Add an
+   `Authorization` header on the address page with the value
+   `Basic <base64 of username:password>` — CloudMailin no longer supports credentials
+   embedded in the target URL. Then copy the address it generates into `Email:InboundAddress`.
 2. **[Google AI Studio](https://ai.google.dev)** — generate a free Gemini API key (no card
    required) for `Gemini:ApiKey`.
 

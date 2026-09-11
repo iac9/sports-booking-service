@@ -8,8 +8,9 @@ namespace SportsBookingService.Api.Auth;
 
 /// <summary>
 /// HTTP Basic Auth for the inbound-email webhook — the one endpoint outside the global Clerk
-/// JWT requirement. CloudMailin sends credentials embedded in the configured target URL as a
-/// standard <c>Authorization: Basic</c> header, so there's nothing provider-specific here.
+/// JWT requirement. Nothing here is provider-specific: it just validates a standard
+/// <c>Authorization: Basic</c> header. CloudMailin sets that header explicitly per address
+/// (it dropped support for credentials embedded in the target URL).
 /// </summary>
 public class InboundEmailWebhookAuthFilter(IConfiguration configuration, ILogger<InboundEmailWebhookAuthFilter> logger)
     : IAsyncAuthorizationFilter
