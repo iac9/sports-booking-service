@@ -52,7 +52,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task Full_extraction_scores_full_confidence()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD"}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":"Alice"}
             """));
 
         var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -63,6 +63,7 @@ public class GeminiBookingExtractionServiceTests
         Assert.Equal("20:00", result.EndTime);
         Assert.Equal(48.50m, result.Cost);
         Assert.Equal("AUD", result.Currency);
+        Assert.Equal("Alice", result.BookedByName);
         Assert.Equal(1.0, result.Confidence);
     }
 
@@ -81,11 +82,24 @@ public class GeminiBookingExtractionServiceTests
     }
 
     [Fact]
+    public async Task A_missing_booker_name_alone_drops_confidence_below_full()
+    {
+        var (service, _) = NewService(_ => Candidate("""
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":null}
+            """));
+
+        var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
+
+        Assert.Null(result.BookedByName);
+        Assert.True(result.Confidence < 1.0);
+    }
+
+    [Fact]
     public async Task Unwraps_a_markdown_fenced_response()
     {
         var (service, _) = NewService(_ => Candidate("""
             ```json
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD"}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":"Alice"}
             ```
             """));
 

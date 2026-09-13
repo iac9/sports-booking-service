@@ -16,6 +16,7 @@ public record BookingExtractionResult(
     string? EndTime,
     decimal? Cost,
     string? Currency,
+    string? BookedByName,
     double Confidence,
     string RawJson
 );

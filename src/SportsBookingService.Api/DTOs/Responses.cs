@@ -11,7 +11,9 @@ public record GroupResponse(
     List<LocationResponse> Locations,
     Guid? PrimaryLocationId,
     Guid? CurrentMemberId,
-    Guid? AdminMemberId
+    Guid? AdminMemberId,
+    bool AutoAcceptBookings = false,
+    decimal? AutoAcceptMaxCost = null
 );
 
 public record GroupSummaryResponse(
@@ -89,13 +91,16 @@ public record PendingBookingResponse(
     string? ExtractedEndTime,
     decimal? ExtractedCost,
     string? ExtractedCurrency,
+    string? ExtractedBookedByName,
     double? ExtractionConfidence,
     string? ExtractionError,
     Guid? MatchedLocationId,
     Guid? MatchedEventId,
+    Guid? MatchedPayerMemberId,
     Guid? CreatedEventId,
     Guid? ReviewedByMemberId,
-    string? ReviewedAt
+    string? ReviewedAt,
+    bool AutoAccepted
 );
 
 public record InboundEmailAddressResponse(string Address);

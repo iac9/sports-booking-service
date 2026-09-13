@@ -14,11 +14,11 @@ public static class LocationMatcher
 {
     public static LocationMatch? Match(string? venueName, IEnumerable<Location> locations)
     {
-        var needle = Normalize(venueName);
+        var needle = NameMatcher.Normalize(venueName);
         if (needle.Length == 0) return null;
 
         var candidates = locations
-            .Select(l => (Location: l, Name: Normalize(l.Name)))
+            .Select(l => (Location: l, Name: NameMatcher.Normalize(l.Name)))
             .Where(c => c.Name.Length > 0)
             .ToList();
 
@@ -34,11 +34,5 @@ public static class LocationMatcher
             .FirstOrDefault();
 
         return partial.Location is null ? null : new LocationMatch(partial.Location, 0.6);
-    }
-
-    private static string Normalize(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return "";
-        return new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     }
 }

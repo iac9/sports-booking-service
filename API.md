@@ -51,6 +51,7 @@ shape changes, update this file in the same change.
 | `PUT /api/groups/{id}/admin` | Transfer the group's admin role to another member. Admin-only. | `{ MemberId: guid }` | `200` → `GroupResponse` · `404` if group not found · `403` if caller isn't the group's admin · `400` if `MemberId` isn't a member of this group |
 | `POST /api/groups/join` | Join a group by its join code, as the caller. Idempotent — if the caller already belongs, no change is made. Rate-limited to 20 requests/minute per caller — `429` if exceeded. | `Code` string<br>`MemberName` string | `200` → `GroupResponse` if the code matched, or `null` if no group has that code (never 404 — a missing code is a normal outcome the client checks for) · `429` if rate-limited |
 | `GET /api/groups/{id}/inbound-email` | The group's booking-email forwarding address — what members point their one-time auto-forward rule at. Every group shares one real mailbox, distinguished by a 12-char `[a-z0-9]` plus-address token: `{localpart}+{token}@{domain}`, derived from the `Email:InboundAddress` setting. Caller must be a member. | — | `200` → `InboundEmailAddressResponse` · `404` if group not found, or inbound email isn't configured on the server · `400` if caller isn't a member |
+| `PUT /api/groups/{id}/booking-automation` | Turn auto-accept of forwarded booking emails on or off for the group, and set the cost ceiling. **Admin-only.** Enabling requires a positive `AutoAcceptMaxCost` — a null ceiling is rejected rather than treated as "no limit", so a half-configured group fails closed. See [Webhooks](#webhooks) for the conditions a booking must satisfy. | `{ AutoAcceptBookings: bool, AutoAcceptMaxCost: decimal \| null }` | `204` · `404` if group not found · `403` if caller isn't the group's admin · `400` if enabling without a positive ceiling |
 | `PUT /api/groups/{id}/primary-location` | Set (or clear) the group's default/primary location. Caller must be a member. | `{ LocationId: guid \| null }` | `204` · `404` if group not found · `400` if caller isn't a member, or `LocationId` is supplied but isn't one of the group's locations |
 
 ## Locations
@@ -102,6 +103,29 @@ Base path: `/api/groups/{groupId}/members/{memberId}`
 
 An unrecognised or malformed recipient token is dropped silently with a `200` and no row created —
 the token is the only spam gate, and confirming to a sender whether a token exists would weaken it.
+
+### Auto-accept
+
+By default every ingested email waits for review. A group whose admin has enabled
+`AutoAcceptBookings` (see Groups above) can have a booking become a real `Event` — plus an
+`Expense` billed to the matched payer — with no review step, but **only** when all of the
+following hold:
+
+1. `AutoAcceptBookings` is on **and** `AutoAcceptMaxCost` is a positive value
+2. Every field was extracted, including `bookedByName`
+3. The venue matched one of the group's `Location`s **exactly** (a partial match is not enough)
+4. `bookedByName` matched exactly one non-guest `Member` — ambiguous names don't match
+5. The date parsed and is not in the past
+6. Start and end times are both present
+7. `0 < cost <= AutoAcceptMaxCost`
+8. No `Event` already exists for that group on that date (this is also the duplicate guard,
+   since forwarding rules do double-deliver)
+
+Anything else leaves the row `Pending` for review, exactly as before. The gate is built from
+facts the service can check against its own data rather than from `ExtractionConfidence`, which
+measures completeness and not correctness: a misread or deliberately crafted email cannot invent
+a `Location` the group has saved or a `Member` to bill. Auto-created rows come back with
+`AutoAccepted: true` so the UI can distinguish them from ones a member confirmed.
 
 ## Pending Bookings
 
@@ -165,7 +189,9 @@ GroupResponse {
   Locations: LocationResponse[],
   PrimaryLocationId: guid?,
   CurrentMemberId: guid?,  // the caller's own Member.Id in this group; null if not a member
-  AdminMemberId: guid  // the Member.Id of the group's admin — the member who created it; only the admin may rename or delete the group
+  AdminMemberId: guid,  // the Member.Id of the group's admin — the member who created it; only the admin may rename or delete the group
+  AutoAcceptBookings: bool,   // see PUT /api/groups/{id}/booking-automation
+  AutoAcceptMaxCost: decimal? // required for AutoAcceptBookings to take effect
 }
 
 GroupSummaryResponse {
@@ -185,13 +211,19 @@ PendingBookingResponse {
   ExtractedDate: string?,     // yyyy-MM-dd
   ExtractedStartTime: string?, ExtractedEndTime: string?,   // 24-hour HH:mm
   ExtractedCost: decimal?, ExtractedCurrency: string?,
-  ExtractionConfidence: double?,  // 1.0 = every field found; lower = partial. Informational
-                                  // only — pre-fills the review form, never auto-creates.
+  ExtractedBookedByName: string?, // name the booking is under, used to identify the payer
+  ExtractionConfidence: double?,  // review-readiness: 1.0 = every field extracted AND the venue
+                                  // and payer both matched existing records; 0.5 or lower means
+                                  // a human still has something to check. Informational only —
+                                  // the auto-accept gate tests the conditions individually.
   ExtractionError: string?,   // set when Status is "Failed"
   MatchedLocationId: guid?,   // best-guess existing Location, pre-selects the dropdown
-  MatchedEventId: guid?,      // an existing Event on the same date/location, if any
+  MatchedEventId: guid?,      // an existing Event on the same date, if any
+  MatchedPayerMemberId: guid?, // the Member matched from ExtractedBookedByName
   CreatedEventId: guid?,      // set once Confirmed
-  ReviewedByMemberId: guid?, ReviewedAt: string?
+  ReviewedByMemberId: guid?, ReviewedAt: string?,
+  AutoAccepted: bool          // true when the auto-accept gate created the event, i.e. nobody
+                              // reviewed it — surfaced so it can be told apart in the UI
 }
 ```
 

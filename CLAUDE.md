@@ -47,13 +47,13 @@ tests/SportsBookingService.Api.Tests/
 
 ## Data Model
 
-- **Group** — has a unique 6-char join `Code`, owns `Members`, `Locations`, `Events`, and an optional `PrimaryLocationId`.
+- **Group** — has a unique 6-char join `Code`, owns `Members`, `Locations`, `Events`, and an optional `PrimaryLocationId`. `AutoAcceptBookings` + `AutoAcceptMaxCost` control whether forwarded booking emails can become events without review (see Email Ingestion).
 - **Member** — belongs to exactly one `Group`; has a server-generated `Id` and a `ClerkUserId` linking it to the authenticated caller. `CurrentMemberService` resolves a request's `Member` by looking up `ClerkUserId` against the verified JWT's subject claim.
 - **Location** — a saved venue belonging to a `Group`.
 - **Event** — belongs to a `Group`; has `CourtBookings`, `Attendees`, `Waitlist`, and `Expenses`.
 - **Attendee** / **WaitlistEntry** — join tables with a `JoinedAt` timestamp, used to order waitlist promotion and cost-balance display.
 - **Expense** — recorded against an `Event`, paid by one `Member`.
-- **PendingBooking** — a forwarded booking-confirmation email awaiting human review. Holds the raw email verbatim (`RawEmailFrom/Subject/Text/Html`, captured *before* extraction so a failed parse loses nothing), the `Extracted*` fields the LLM produced, a best-guess `MatchedLocationId`/`MatchedEventId`, and the review outcome (`Status`, `CreatedEventId`, `ReviewedByMemberId`, `ReviewedAt`). `Status` is `Pending` / `Confirmed` / `Dismissed` / `Failed`.
+- **PendingBooking** — a forwarded booking-confirmation email awaiting human review. Holds the raw email verbatim (`RawEmailFrom/Subject/Text/Html`, captured *before* extraction so a failed parse loses nothing), the `Extracted*` fields the LLM produced, best-guess matches (`MatchedLocationId`, `MatchedPayerMemberId`, `MatchedEventId`), and the review outcome (`Status`, `CreatedEventId`, `ReviewedByMemberId`, `ReviewedAt`, `AutoAccepted`). `Status` is `Pending` / `Confirmed` / `Dismissed` / `Failed`.
 - **Settlement** — records a settled debt between two `Member`s for a given `Event` (`FromMemberId`, `ToMemberId`, `Amount`, `SettledAt`); once recorded, `DebtService` excludes the corresponding simplified debt from `GetOwedToMemberAsync` results.
 
 ---
@@ -78,7 +78,18 @@ by a plus-address token, not by separate mailboxes.
 
 Flow: `POST /api/webhooks/email` → `EmailIngestionService` → a `PendingBooking` row → a member
 reviews it in the UI → `PendingBookingService.ConfirmAsync` → a real `Event` (+ optional
-`Expense`). **Nothing is created automatically** — this is a review queue, not automation.
+`Expense`).
+
+**By default nothing is created automatically.** A group's admin can opt into auto-accept
+(`Group.AutoAcceptBookings`), which lets a booking skip review — but only behind the gate in
+`EmailIngestionService.AutoAcceptBlocker`. That gate is built from **verifiable facts**, never
+from `ExtractionConfidence`: the venue must match a saved `Location` exactly, the booker's name
+must match exactly one non-guest `Member` (who is billed), the date must be valid and upcoming,
+the cost must sit under the group's ceiling, and no event may already exist that day. A misread
+or deliberately crafted email therefore can't invent a location, a payer, or a duplicate.
+
+If you touch this, the rule to preserve is: **never create an `Event` from an email outside that
+gate**, and never gate on the model's own confidence.
 
 Non-obvious pieces:
 
@@ -95,8 +106,16 @@ Non-obvious pieces:
 - **Extraction is one provider-agnostic LLM call** (`GeminiBookingExtractionService`), not a
   per-provider parser registry — a new booking site needs no code. The prompt states the email
   is untrusted data, since anyone who learns a forwarding address can send to it.
-- `LocationMatcher` is a pure static function with no DB dependency; its confidence score is
-  informational (it pre-selects a dropdown) and never gates creation.
+- `LocationMatcher` and `MemberMatcher` are pure static functions with no DB dependency, sharing
+  normalisation via `NameMatcher`. `MemberMatcher` is deliberately stricter: where two members
+  match equally it returns null rather than picking one, because a wrong venue guess only
+  mis-preselects a dropdown whereas a wrong payer bills the wrong person.
+- **`ExtractionConfidence` means review-readiness**, not extraction accuracy: it starts from how
+  many fields were extracted, then drops when the venue or payer couldn't be matched. It drives
+  the UI's "Partial" badge and nothing else.
+- **The webhook runs anonymously**, so it can't use `CurrentMemberService`. `EventService` exposes
+  `CreateAsAsync` / `AddExpenseWithoutCallerCheckAsync` taking an explicit member; the
+  token-based methods delegate to them, so creation logic stays in one place.
 
 Config (user-secrets locally, `Section__Key` env vars in prod): `Email:WebhookUsername`,
 `Email:WebhookPassword`, `Email:InboundAddress`, `Gemini:ApiKey`. `Gemini:Model` has an

@@ -138,12 +138,15 @@ public class PendingBookingService(
         p.ExtractedEndTime,
         p.ExtractedCost,
         p.ExtractedCurrency,
+        p.ExtractedBookedByName,
         p.ExtractionConfidence,
         p.ExtractionError,
         p.MatchedLocationId,
         p.MatchedEventId,
+        p.MatchedPayerMemberId,
         p.CreatedEventId,
         p.ReviewedByMemberId,
-        p.ReviewedAt?.ToString("o")
+        p.ReviewedAt?.ToString("o"),
+        p.AutoAccepted
     );
 }

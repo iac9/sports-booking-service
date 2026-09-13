@@ -158,6 +158,32 @@ public class GroupService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         return ServiceResult.Success();
     }
 
+    /// <summary>
+    /// Admin-only: this changes how inbound booking emails are handled for the entire group,
+    /// not just for the caller, so it follows the same gate as renaming or deleting.
+    /// </summary>
+    public async Task<ServiceResult> SetBookingAutomationAsync(Guid groupId, SetBookingAutomationRequest request)
+    {
+        var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == groupId);
+        if (group is null) return ServiceResult.Fail(ServiceErrorKind.NotFound);
+
+        var member = await currentMemberService.FindMemberAsync(groupId);
+        if (member is null || group.AdminMemberId != member.Id) return ServiceResult.Fail(ServiceErrorKind.Forbidden);
+
+        // Refuse the half-configured state outright rather than silently never firing: without
+        // a ceiling, auto-accept would have no upper bound on what it could create.
+        if (request.AutoAcceptBookings && request.AutoAcceptMaxCost is not > 0)
+            return ServiceResult.Fail(ServiceErrorKind.BadRequest, "A maximum cost is required to enable auto-accept.");
+
+        group.AutoAcceptBookings = request.AutoAcceptBookings;
+        group.AutoAcceptMaxCost = request.AutoAcceptMaxCost;
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Group {GroupId} booking auto-accept set to {Enabled} (ceiling {MaxCost}) by member {MemberId}",
+            groupId, request.AutoAcceptBookings, request.AutoAcceptMaxCost, member.Id);
+        return ServiceResult.Success();
+    }
+
     private static string GenerateCode()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

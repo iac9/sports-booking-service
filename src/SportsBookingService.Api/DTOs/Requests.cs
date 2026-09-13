@@ -95,3 +95,8 @@ public record ConfirmPendingBookingRequest(
     [Range(0.01, 100000)] decimal? ExpenseAmount,
     [StringLength(200, MinimumLength = 1)] string? ExpenseDescription
 );
+
+public record SetBookingAutomationRequest(
+    bool AutoAcceptBookings,
+    [Range(0.01, 100000)] decimal? AutoAcceptMaxCost
+);

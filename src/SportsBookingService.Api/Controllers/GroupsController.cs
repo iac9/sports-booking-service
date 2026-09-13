@@ -101,6 +101,13 @@ public class GroupsController(
         return result.IsSuccess ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
 
+    [HttpPut("{id:guid}/booking-automation")]
+    public async Task<IActionResult> SetBookingAutomation(Guid id, SetBookingAutomationRequest request)
+    {
+        var result = await groupService.SetBookingAutomationAsync(id, request);
+        return result.IsSuccess ? NoContent() : this.ToActionResult(result.Error!);
+    }
+
     [HttpPut("{id:guid}/primary-location")]
     public async Task<IActionResult> SetPrimaryLocation(Guid id, SetPrimaryLocationRequest request)
     {

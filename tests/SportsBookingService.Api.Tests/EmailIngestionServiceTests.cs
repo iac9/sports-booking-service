@@ -38,8 +38,8 @@ public class EmailIngestionServiceTests : IDisposable
         }
     }
 
-    private static BookingExtractionResult FullResult(string venueName = "Melbourne Sports Centre") => new(
-        venueName, new DateOnly(2026, 10, 2), "18:00", "20:00", 48.50m, "AUD", 1.0, "{}");
+    private static BookingExtractionResult FullResult(string venueName = "Melbourne Sports Centre", string? bookedByName = "Alice") => new(
+        venueName, new DateOnly(2026, 10, 2), "18:00", "20:00", 48.50m, "AUD", bookedByName, 1.0, "{}");
 
     private static CloudMailinInboundWebhookPayload Payload(string to, string plain = "Your booking is confirmed.") => new(
         new CloudMailinEnvelope(to, "jane@gmail.com", [to]),
@@ -48,7 +48,8 @@ public class EmailIngestionServiceTests : IDisposable
         null);
 
     private static EmailIngestionService NewService(AppDbContext db, IBookingExtractionService extractor) =>
-        new(db, extractor, NullLogger<EmailIngestionService>.Instance);
+        new(db, extractor, TestServices.NewEventService(db, TestServices.NewCurrentMemberService(db, "clerk-nobody")),
+            NullLogger<EmailIngestionService>.Instance);
 
     [Fact]
     public async Task Stores_a_pending_row_with_extracted_fields_and_a_matched_location()

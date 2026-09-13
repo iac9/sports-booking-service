@@ -37,6 +37,9 @@ public class GeminiBookingExtractionService(
           "endTime":   string or null  - the booking end time as 24-hour HH:mm
           "cost":      number or null  - the total amount charged, digits only
           "currency":  string or null  - the 3-letter ISO currency code, e.g. AUD
+          "bookedByName": string or null - the name of the person the booking is under, as
+                                           written in the email (e.g. the greeting or a
+                                           "booked by" line). Not the venue or company name.
 
         Use null for anything the email does not clearly state. Do not guess.
         Output the JSON object and nothing else.
@@ -142,8 +145,9 @@ public class GeminiBookingExtractionService(
         var startTime = Blank(extracted.StartTime);
         var endTime = Blank(extracted.EndTime);
         var currency = Blank(extracted.Currency);
+        var bookedByName = Blank(extracted.BookedByName);
 
-        object?[] fields = [venueName, date, startTime, endTime, extracted.Cost, currency];
+        object?[] fields = [venueName, date, startTime, endTime, extracted.Cost, currency, bookedByName];
         var populated = fields.Count(f => f is not null);
         if (populated == 0)
             throw new BookingExtractionException("Gemini found no booking details in the email.");
@@ -152,7 +156,7 @@ public class GeminiBookingExtractionService(
         // "complete vs. needs-a-human-look" distinction the review UI actually acts on.
         var confidence = populated == fields.Length ? 1.0 : 0.5;
 
-        return new BookingExtractionResult(venueName, date, startTime, endTime, extracted.Cost, currency, confidence, json);
+        return new BookingExtractionResult(venueName, date, startTime, endTime, extracted.Cost, currency, bookedByName, confidence, json);
     }
 
     private static string StripCodeFence(string text)
@@ -196,5 +200,6 @@ public class GeminiBookingExtractionService(
         string? StartTime,
         string? EndTime,
         decimal? Cost,
-        string? Currency);
+        string? Currency,
+        string? BookedByName);
 }

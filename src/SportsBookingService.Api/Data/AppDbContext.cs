@@ -94,6 +94,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(p => p.CreatedEventId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Unlike ReviewedByMember (Restrict), a removed payer must not block deleting the
+        // member — the match was only ever a best guess, and the raw email still stands.
+        modelBuilder.Entity<PendingBooking>()
+            .HasOne(p => p.MatchedPayerMember)
+            .WithMany()
+            .HasForeignKey(p => p.MatchedPayerMemberId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<PendingBooking>()
             .HasOne(p => p.ReviewedByMember)
             .WithMany()

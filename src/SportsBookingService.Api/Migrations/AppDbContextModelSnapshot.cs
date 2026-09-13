@@ -144,6 +144,12 @@ namespace SportsBookingService.Api.Migrations
                     b.Property<Guid?>("AdminMemberId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AutoAcceptBookings")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("AutoAcceptMaxCost")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("text");
@@ -235,11 +241,17 @@ namespace SportsBookingService.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AutoAccepted")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedEventId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ExtractedBookedByName")
+                        .HasColumnType("text");
 
                     b.Property<decimal?>("ExtractedCost")
                         .HasColumnType("numeric");
@@ -275,6 +287,9 @@ namespace SportsBookingService.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("MatchedLocationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MatchedPayerMemberId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("ProviderHint")
@@ -314,6 +329,8 @@ namespace SportsBookingService.Api.Migrations
                     b.HasIndex("MatchedEventId");
 
                     b.HasIndex("MatchedLocationId");
+
+                    b.HasIndex("MatchedPayerMemberId");
 
                     b.HasIndex("ReviewedByMemberId");
 
@@ -502,6 +519,11 @@ namespace SportsBookingService.Api.Migrations
                         .HasForeignKey("MatchedLocationId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("SportsBookingService.Api.Models.Member", "MatchedPayerMember")
+                        .WithMany()
+                        .HasForeignKey("MatchedPayerMemberId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SportsBookingService.Api.Models.Member", "ReviewedByMember")
                         .WithMany()
                         .HasForeignKey("ReviewedByMemberId")
@@ -514,6 +536,8 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("MatchedEvent");
 
                     b.Navigation("MatchedLocation");
+
+                    b.Navigation("MatchedPayerMember");
 
                     b.Navigation("ReviewedByMember");
                 });

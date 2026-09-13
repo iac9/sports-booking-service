@@ -35,6 +35,20 @@ public class PendingBooking
     public string? ExtractedEndTime { get; set; }
     public decimal? ExtractedCost { get; set; }
     public string? ExtractedCurrency { get; set; }
+
+    /// <summary>
+    /// The name the booking is under, as written in the email. Used to identify who paid:
+    /// <see cref="Member"/> has no email column, and with auto-forward rules the envelope
+    /// sender is the forwarder rather than the booker, so the body is the only signal.
+    /// </summary>
+    public string? ExtractedBookedByName { get; set; }
+
+    /// <summary>
+    /// Review-readiness rather than raw extraction accuracy: starts from how many fields were
+    /// extracted, then drops when the venue or payer couldn't be matched to existing records.
+    /// This is what the review UI's "Partial" badge reflects. Informational — the auto-accept
+    /// gate checks the individual verifiable conditions, never this number.
+    /// </summary>
     public double? ExtractionConfidence { get; set; }
     public string? ExtractedRawJson { get; set; }
     public string? ExtractionError { get; set; }
@@ -44,6 +58,8 @@ public class PendingBooking
     public Location? MatchedLocation { get; set; }
     public Guid? MatchedEventId { get; set; }
     public Event? MatchedEvent { get; set; }
+    public Guid? MatchedPayerMemberId { get; set; }
+    public Member? MatchedPayerMember { get; set; }
 
     // ── Review outcome ──────────────────────────────────────────────────────────
     public Guid? CreatedEventId { get; set; }
@@ -51,5 +67,13 @@ public class PendingBooking
     public Guid? ReviewedByMemberId { get; set; }
     public Member? ReviewedByMember { get; set; }
     public DateTime? ReviewedAt { get; set; }
+
+    /// <summary>
+    /// True when the event was created by the auto-accept gate rather than by a member
+    /// pressing confirm. Surfaced in the review queue so an unreviewed creation is never
+    /// indistinguishable from a reviewed one.
+    /// </summary>
+    public bool AutoAccepted { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

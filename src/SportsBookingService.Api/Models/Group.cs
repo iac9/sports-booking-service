@@ -12,6 +12,21 @@ public class Group
     /// on the webhook, so it is longer and higher-entropy than the share-friendly join <see cref="Code"/>.
     /// </summary>
     public string? InboundEmailToken { get; set; }
+
+    /// <summary>
+    /// Opt-in: when set, a forwarded booking that satisfies every check in
+    /// <c>EmailIngestionService</c> becomes a real <see cref="Event"/> with no human review.
+    /// Off by default, and admin-only to change, since it alters behaviour for the whole group.
+    /// </summary>
+    public bool AutoAcceptBookings { get; set; }
+
+    /// <summary>
+    /// Ceiling on an auto-accepted booking's cost. Required for auto-accept to fire at all —
+    /// a null here disables it even when <see cref="AutoAcceptBookings"/> is true, so a
+    /// half-configured group fails closed rather than accepting any amount.
+    /// </summary>
+    public decimal? AutoAcceptMaxCost { get; set; }
+
     public Guid? PrimaryLocationId { get; set; }
     public Guid? AdminMemberId { get; set; }
     public Member? AdminMember { get; set; }

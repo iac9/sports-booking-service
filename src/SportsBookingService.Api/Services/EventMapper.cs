@@ -62,7 +62,9 @@ public class EventMapper(AppDbContext db, CostService costService, CurrentMember
             group.Locations.Select(l => new LocationResponse(l.Id, l.Name, l.Address, l.WebsiteUrl)).ToList(),
             group.PrimaryLocationId,
             currentMember?.Id,
-            group.AdminMemberId
+            group.AdminMemberId,
+            group.AutoAcceptBookings,
+            group.AutoAcceptMaxCost
         ));
     }
 }

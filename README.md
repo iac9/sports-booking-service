@@ -81,6 +81,13 @@ dotnet user-secrets set "Email:InboundAddress" "<yourhash>@cloudmailin.net" --pr
 dotnet user-secrets set "Gemini:ApiKey" "<key>" --project src/SportsBookingService.Api
 ```
 
+Once configured, forwarded bookings land in a review queue by default. A group's admin can
+optionally enable auto-accept (Settings → Booking emails, or
+`PUT /api/groups/{id}/booking-automation`), which creates the event without review — but only
+when the venue exactly matches a saved location, the name on the booking matches one member, the
+date is upcoming, the cost is under a configured ceiling, and no event exists that day. See
+[API.md](API.md#auto-accept) for the full list.
+
 In production these are environment variables using the `Section__Key` convention
 (`Email__WebhookUsername`, `Gemini__ApiKey`, …). `Gemini:Model` defaults to
 `gemini-flash-lite-latest` in `appsettings.json` and can be overridden per environment.

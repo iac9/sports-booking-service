@@ -16,6 +16,17 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
         if (member is null)
             return ServiceResult<EventDetailResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
 
+        return await CreateAsAsync(groupId, request, member);
+    }
+
+    /// <summary>
+    /// Creates an event on behalf of an explicitly supplied member instead of the caller
+    /// resolved from the JWT. The inbound-email webhook needs this: it runs anonymously, so
+    /// <see cref="CurrentMemberService.GetClerkUserId"/> would throw. The token-based overload
+    /// above delegates here, keeping event creation in exactly one place.
+    /// </summary>
+    public async Task<ServiceResult<EventDetailResponse>> CreateAsAsync(Guid groupId, CreateEventRequest request, Member member)
+    {
         var ev = new Event
         {
             Id = Guid.NewGuid(),
@@ -226,11 +237,22 @@ public class EventService(AppDbContext db, EventMapper eventMapper, CurrentMembe
 
     public async Task<ServiceResult<ExpenseResponse>> AddExpenseAsync(Guid groupId, Guid id, AddExpenseRequest request)
     {
-        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
-        if (ev is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.NotFound);
-
         var caller = await currentMemberService.FindMemberAsync(groupId);
         if (caller is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
+
+        return await AddExpenseWithoutCallerCheckAsync(groupId, id, request);
+    }
+
+    /// <summary>
+    /// Records an expense without resolving a caller from the JWT — for the anonymous
+    /// inbound-email webhook. The group-membership guarantee still holds: the payer named in
+    /// the request is verified to belong to <paramref name="groupId"/> below, exactly as in
+    /// the token-based path.
+    /// </summary>
+    public async Task<ServiceResult<ExpenseResponse>> AddExpenseWithoutCallerCheckAsync(Guid groupId, Guid id, AddExpenseRequest request)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == id && e.GroupId == groupId);
+        if (ev is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.NotFound);
 
         var paidBy = await db.Members.FirstOrDefaultAsync(m => m.Id == request.PaidByMemberId && m.GroupId == groupId);
         if (paidBy is null) return ServiceResult<ExpenseResponse>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
