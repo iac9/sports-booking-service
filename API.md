@@ -116,7 +116,8 @@ following hold:
 3. The venue matched one of the group's `Location`s **exactly** (a partial match is not enough)
 4. `bookedByName` matched exactly one non-guest `Member` — ambiguous names don't match
 5. The date parsed and is not in the past
-6. Start and end times are both present
+6. At least one court/time-slot was found, and every slot found has both a start and end time
+   (an email booking several courts is fine, as long as every court's times are usable)
 7. `0 < cost <= AutoAcceptMaxCost`
 8. No `Event` already exists for that group on that date (this is also the duplicate guard,
    since forwarding rules do double-deliver)
@@ -160,6 +161,7 @@ MemberResponse       { Id: guid, Name: string, IsGuest: bool, AddedByMemberId: g
                      // and GET /api/groups/{id}/members entirely.
 LocationResponse     { Id: guid, Name: string, Address: string, WebsiteUrl: string? }
 CourtBookingResponse { Id: guid, Court: string, StartTime: string, EndTime: string }
+ExtractedCourtBookingResponse { Court: string?, StartTime: string, EndTime: string }
 BalanceResponse      { Member: MemberResponse, Balance: decimal }
 CostBreakdownResponse { TotalCost: decimal, CostPerAttendee: decimal, Balances: BalanceResponse[] }
 DebtResponse         { EventId: guid, EventTitle: string, Date: string, FromMember: MemberResponse, Amount: decimal, Settled: bool, SettledAt: string? }
@@ -209,7 +211,10 @@ PendingBookingResponse {
   ProviderHint: string?,      // sender's domain, e.g. "yepbooking.com"
   ExtractedVenueName: string?,
   ExtractedDate: string?,     // yyyy-MM-dd
-  ExtractedStartTime: string?, ExtractedEndTime: string?,   // 24-hour HH:mm
+  ExtractedStartTime: string?, ExtractedEndTime: string?,   // 24-hour HH:mm; first court/slot found
+  ExtractedCourtBookings: ExtractedCourtBookingResponse[],  // every court/slot found — 1 entry for
+                                                             // a normal booking, more if the email
+                                                             // books several courts
   ExtractedCost: decimal?, ExtractedCurrency: string?,
   ExtractedBookedByName: string?, // name the booking is under, used to identify the payer
   ExtractionConfidence: double?,  // review-readiness: 1.0 = every field extracted AND the venue

@@ -135,6 +135,33 @@ namespace SportsBookingService.Api.Migrations
                     b.ToTable("Expenses");
                 });
 
+            modelBuilder.Entity("SportsBookingService.Api.Models.ExtractedCourtBooking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Court")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EndTime")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PendingBookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StartTime")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PendingBookingId");
+
+                    b.ToTable("ExtractedCourtBookings");
+                });
+
             modelBuilder.Entity("SportsBookingService.Api.Models.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -464,6 +491,17 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("PaidBy");
                 });
 
+            modelBuilder.Entity("SportsBookingService.Api.Models.ExtractedCourtBooking", b =>
+                {
+                    b.HasOne("SportsBookingService.Api.Models.PendingBooking", "PendingBooking")
+                        .WithMany("ExtractedCourtBookings")
+                        .HasForeignKey("PendingBookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PendingBooking");
+                });
+
             modelBuilder.Entity("SportsBookingService.Api.Models.Group", b =>
                 {
                     b.HasOne("SportsBookingService.Api.Models.Member", "AdminMember")
@@ -610,6 +648,11 @@ namespace SportsBookingService.Api.Migrations
                     b.Navigation("Members");
 
                     b.Navigation("PendingBookings");
+                });
+
+            modelBuilder.Entity("SportsBookingService.Api.Models.PendingBooking", b =>
+                {
+                    b.Navigation("ExtractedCourtBookings");
                 });
 #pragma warning restore 612, 618
         }

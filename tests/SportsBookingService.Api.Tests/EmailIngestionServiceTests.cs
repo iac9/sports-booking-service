@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using SportsBookingService.Api.Data;
 using SportsBookingService.Api.DTOs;
@@ -38,8 +39,13 @@ public class EmailIngestionServiceTests : IDisposable
         }
     }
 
-    private static BookingExtractionResult FullResult(string venueName = "Melbourne Sports Centre", string? bookedByName = "Alice") => new(
-        venueName, new DateOnly(2026, 10, 2), "18:00", "20:00", 48.50m, "AUD", bookedByName, 1.0, "{}");
+    private static BookingExtractionResult FullResult(
+        string venueName = "Melbourne Sports Centre", string? bookedByName = "Alice", IReadOnlyList<ExtractedCourtSlot>? courtSlots = null)
+    {
+        var slots = courtSlots ?? [new ExtractedCourtSlot(null, "18:00", "20:00")];
+        return new(venueName, new DateOnly(2026, 10, 2), slots.FirstOrDefault()?.StartTime, slots.FirstOrDefault()?.EndTime,
+            48.50m, "AUD", bookedByName, slots, 1.0, "{}");
+    }
 
     private static CloudMailinInboundWebhookPayload Payload(string to, string plain = "Your booking is confirmed.") => new(
         new CloudMailinEnvelope(to, "jane@gmail.com", [to]),
@@ -121,6 +127,27 @@ public class EmailIngestionServiceTests : IDisposable
 
         using var verify = TestServices.NewContext(connection);
         Assert.Equal(eventId, Assert.Single(verify.PendingBookings).MatchedEventId);
+    }
+
+    [Fact]
+    public async Task Persists_every_extracted_court_when_an_email_books_more_than_one()
+    {
+        var extractor = new FakeExtractor(() => FullResult(courtSlots:
+        [
+            new ExtractedCourtSlot("3", "18:00", "20:00"),
+            new ExtractedCourtSlot("5", "18:00", "20:00"),
+        ]));
+        using (var db = TestServices.NewContext(connection))
+            await NewService(db, extractor).IngestAsync(Payload($"inbox+{Token}@cloudmailin.net"));
+
+        using var verify = TestServices.NewContext(connection);
+        var pending = verify.PendingBookings.Include(p => p.ExtractedCourtBookings).Single();
+        Assert.Equal(2, pending.ExtractedCourtBookings.Count);
+        Assert.Contains(pending.ExtractedCourtBookings, c => c.Court == "3");
+        Assert.Contains(pending.ExtractedCourtBookings, c => c.Court == "5");
+        // The flat fields mirror the first slot, for the review queue's one-line summary.
+        Assert.Equal("18:00", pending.ExtractedStartTime);
+        Assert.Equal("20:00", pending.ExtractedEndTime);
     }
 
     [Fact]

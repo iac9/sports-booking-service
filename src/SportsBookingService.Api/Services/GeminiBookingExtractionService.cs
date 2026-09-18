@@ -33,9 +33,16 @@ public class GeminiBookingExtractionService(
         Return a single JSON object with exactly these keys:
           "venueName": string or null  - the venue/centre name the court was booked at
           "date":      string or null  - the booking date as YYYY-MM-DD
-          "startTime": string or null  - the booking start time as 24-hour HH:mm
-          "endTime":   string or null  - the booking end time as 24-hour HH:mm
-          "cost":      number or null  - the total amount charged, digits only
+          "courts":    an array of objects, one per distinct court or time-slot the email books,
+                       each with:
+                         "court":     string or null - the court/pitch number or name as written,
+                                      e.g. "3" (null if the email doesn't name it)
+                         "startTime": string or null - 24-hour HH:mm
+                         "endTime":   string or null - 24-hour HH:mm
+                       Most emails book a single court — return a one-item array in that case.
+                       Only include an entry for a court/slot if you found both a start and an
+                       end time for it.
+          "cost":      number or null  - the total amount charged across all courts, digits only
           "currency":  string or null  - the 3-letter ISO currency code, e.g. AUD
           "bookedByName": string or null - the name of the person the booking is under, as
                                            written in the email (e.g. the greeting or a
@@ -142,12 +149,19 @@ public class GeminiBookingExtractionService(
             logger.LogWarning("Gemini returned an unparseable date {Date}; treating it as missing", extracted.Date);
 
         var venueName = Blank(extracted.VenueName);
-        var startTime = Blank(extracted.StartTime);
-        var endTime = Blank(extracted.EndTime);
         var currency = Blank(extracted.Currency);
         var bookedByName = Blank(extracted.BookedByName);
 
-        object?[] fields = [venueName, date, startTime, endTime, extracted.Cost, currency, bookedByName];
+        // Only a slot with both a start and end time is usable — everything downstream (the
+        // auto-accept gate, the review form) can then assume every entry in this list is complete
+        // without checking each field again.
+        var courtSlots = (extracted.Courts ?? [])
+            .Select(c => (Court: Blank(c.Court), StartTime: Blank(c.StartTime), EndTime: Blank(c.EndTime)))
+            .Where(s => s.StartTime is not null && s.EndTime is not null)
+            .Select(s => new ExtractedCourtSlot(s.Court, s.StartTime!, s.EndTime!))
+            .ToList();
+
+        object?[] fields = [venueName, date, courtSlots.Count > 0 ? true : null, extracted.Cost, currency, bookedByName];
         var populated = fields.Count(f => f is not null);
         if (populated == 0)
             throw new BookingExtractionException("Gemini found no booking details in the email.");
@@ -156,7 +170,10 @@ public class GeminiBookingExtractionService(
         // "complete vs. needs-a-human-look" distinction the review UI actually acts on.
         var confidence = populated == fields.Length ? 1.0 : 0.5;
 
-        return new BookingExtractionResult(venueName, date, startTime, endTime, extracted.Cost, currency, bookedByName, confidence, json);
+        var firstSlot = courtSlots.FirstOrDefault();
+        return new BookingExtractionResult(
+            venueName, date, firstSlot?.StartTime, firstSlot?.EndTime, extracted.Cost, currency, bookedByName,
+            courtSlots, confidence, json);
     }
 
     private static string StripCodeFence(string text)
@@ -197,9 +214,10 @@ public class GeminiBookingExtractionService(
     private record ExtractionPayload(
         string? VenueName,
         string? Date,
-        string? StartTime,
-        string? EndTime,
+        CourtPayload[]? Courts,
         decimal? Cost,
         string? Currency,
         string? BookedByName);
+
+    private record CourtPayload(string? Court, string? StartTime, string? EndTime);
 }

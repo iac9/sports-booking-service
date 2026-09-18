@@ -37,6 +37,14 @@ public class PendingBooking
     public string? ExtractedCurrency { get; set; }
 
     /// <summary>
+    /// Every court/time-slot the email mentioned — one entry for a normal single-court booking,
+    /// more when the email books several. <see cref="ExtractedStartTime"/>/<see
+    /// cref="ExtractedEndTime"/> above always mirror the first entry here, for the review queue's
+    /// one-line summary.
+    /// </summary>
+    public ICollection<ExtractedCourtBooking> ExtractedCourtBookings { get; set; } = new List<ExtractedCourtBooking>();
+
+    /// <summary>
     /// The name the booking is under, as written in the email. Used to identify who paid:
     /// <see cref="Member"/> has no email column, and with auto-forward rules the envelope
     /// sender is the forwarder rather than the booker, so the body is the only signal.

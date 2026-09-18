@@ -76,6 +76,18 @@ public partial class EmailIngestionService(
             pending.ExtractedBookedByName = extraction.BookedByName;
             pending.ExtractedRawJson = extraction.RawJson;
 
+            // Added via the DbSet rather than `pending.ExtractedCourtBookings.Add(...)` — `pending`
+            // was already saved once above and is now tracked Unchanged, and EF only reliably
+            // treats a new child as an insert here when it's added this way (same pattern as
+            // EventService.UpdateAsync's CourtBookings).
+            foreach (var slot in extraction.CourtSlots)
+            {
+                db.ExtractedCourtBookings.Add(new ExtractedCourtBooking
+                {
+                    Id = Guid.NewGuid(), Court = slot.Court, StartTime = slot.StartTime, EndTime = slot.EndTime, PendingBookingId = pending.Id,
+                });
+            }
+
             var locationMatch = LocationMatcher.Match(extraction.VenueName, group.Locations);
             pending.MatchedLocationId = locationMatch?.Location.Id;
 
@@ -156,7 +168,9 @@ public partial class EmailIngestionService(
                 Date: extraction.Date!.Value.ToString("yyyy-MM-dd"),
                 LocationId: locationMatch.Location.Id,
                 MaxAttendees: null,
-                CourtBookings: [new CreateCourtBookingRequest("1", extraction.StartTime!, extraction.EndTime!)]),
+                CourtBookings: extraction.CourtSlots
+                    .Select((slot, i) => new CreateCourtBookingRequest(slot.Court ?? (i + 1).ToString(), slot.StartTime, slot.EndTime))
+                    .ToList()),
                 payerMatch!.Member);
 
             if (!created.IsSuccess)
@@ -213,8 +227,9 @@ public partial class EmailIngestionService(
         if (payerMatch is null) return "booker name did not match exactly one member";
         if (extraction.Date is not { } date) return "no booking date";
         if (date < DateOnly.FromDateTime(DateTime.UtcNow)) return "booking date is in the past";
-        if (string.IsNullOrWhiteSpace(extraction.StartTime) || string.IsNullOrWhiteSpace(extraction.EndTime))
-            return "missing start or end time";
+        // Every entry in CourtSlots already has both times (see ParseExtraction), so this alone
+        // covers "found at least one usable court/time-slot" for however many courts were booked.
+        if (extraction.CourtSlots.Count == 0) return "missing start or end time";
         if (extraction.Cost is not { } cost || cost <= 0) return "no usable cost";
         if (cost > maxCost) return $"cost {cost} exceeds the {maxCost} ceiling";
 

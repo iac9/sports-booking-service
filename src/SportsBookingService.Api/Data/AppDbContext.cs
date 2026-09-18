@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Settlement> Settlements => Set<Settlement>();
     public DbSet<PendingBooking> PendingBookings => Set<PendingBooking>();
+    public DbSet<ExtractedCourtBooking> ExtractedCourtBookings => Set<ExtractedCourtBooking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

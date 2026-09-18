@@ -52,7 +52,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task Full_extraction_scores_full_confidence()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":"Alice"}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[{"court":null,"startTime":"18:00","endTime":"20:00"}],"cost":48.50,"currency":"AUD","bookedByName":"Alice"}
             """));
 
         var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -65,19 +65,53 @@ public class GeminiBookingExtractionServiceTests
         Assert.Equal("AUD", result.Currency);
         Assert.Equal("Alice", result.BookedByName);
         Assert.Equal(1.0, result.Confidence);
+        Assert.Single(result.CourtSlots);
+    }
+
+    [Fact]
+    public async Task Multiple_courts_are_all_captured_and_the_first_mirrors_the_flat_fields()
+    {
+        var (service, _) = NewService(_ => Candidate("""
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[{"court":"3","startTime":"18:00","endTime":"20:00"},{"court":"5","startTime":"18:00","endTime":"20:00"}],"cost":97.00,"currency":"AUD","bookedByName":"Alice"}
+            """));
+
+        var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
+
+        Assert.Equal(2, result.CourtSlots.Count);
+        Assert.Equal("3", result.CourtSlots[0].Court);
+        Assert.Equal("5", result.CourtSlots[1].Court);
+        Assert.All(result.CourtSlots, s => Assert.Equal(("18:00", "20:00"), (s.StartTime, s.EndTime)));
+        // Flat fields mirror the first slot, for the review queue's one-line summary.
+        Assert.Equal("18:00", result.StartTime);
+        Assert.Equal("20:00", result.EndTime);
+        Assert.Equal(1.0, result.Confidence);
+    }
+
+    [Fact]
+    public async Task A_court_missing_either_time_is_dropped_rather_than_kept_incomplete()
+    {
+        var (service, _) = NewService(_ => Candidate("""
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[{"court":"3","startTime":"18:00","endTime":"20:00"},{"court":"5","startTime":"18:00","endTime":null}],"cost":48.50,"currency":"AUD","bookedByName":"Alice"}
+            """));
+
+        var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
+
+        Assert.Single(result.CourtSlots);
+        Assert.Equal("3", result.CourtSlots[0].Court);
     }
 
     [Fact]
     public async Task Partial_extraction_scores_lower_confidence()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":null,"endTime":null,"cost":null,"currency":null}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[],"cost":null,"currency":null}
             """));
 
         var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
 
         Assert.Equal("Melbourne Sports Centre", result.VenueName);
         Assert.Null(result.Cost);
+        Assert.Empty(result.CourtSlots);
         Assert.True(result.Confidence < 1.0);
     }
 
@@ -85,7 +119,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task A_missing_booker_name_alone_drops_confidence_below_full()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":null}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[{"court":null,"startTime":"18:00","endTime":"20:00"}],"cost":48.50,"currency":"AUD","bookedByName":null}
             """));
 
         var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -99,7 +133,7 @@ public class GeminiBookingExtractionServiceTests
     {
         var (service, _) = NewService(_ => Candidate("""
             ```json
-            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD","bookedByName":"Alice"}
+            {"venueName":"Melbourne Sports Centre","date":"2026-10-02","courts":[{"court":null,"startTime":"18:00","endTime":"20:00"}],"cost":48.50,"currency":"AUD","bookedByName":"Alice"}
             ```
             """));
 
@@ -113,7 +147,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task An_unparseable_date_is_treated_as_missing_rather_than_failing()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":"next Tuesday","startTime":"18:00","endTime":"20:00","cost":48.50,"currency":"AUD"}
+            {"venueName":"Melbourne Sports Centre","date":"next Tuesday","courts":[{"court":null,"startTime":"18:00","endTime":"20:00"}],"cost":48.50,"currency":"AUD"}
             """));
 
         var result = await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -127,7 +161,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task Sends_the_api_key_as_a_header_and_never_in_the_url()
     {
         var (service, handler) = NewService(_ => Candidate("""
-            {"venueName":"Melbourne Sports Centre","date":null,"startTime":null,"endTime":null,"cost":null,"currency":null}
+            {"venueName":"Melbourne Sports Centre","date":null,"courts":[],"cost":null,"currency":null}
             """));
 
         await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -140,7 +174,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task Uses_the_configured_model()
     {
         var (service, handler) = NewService(
-            _ => Candidate("""{"venueName":"X","date":null,"startTime":null,"endTime":null,"cost":null,"currency":null}"""),
+            _ => Candidate("""{"venueName":"X","date":null,"courts":[],"cost":null,"currency":null}"""),
             ("Gemini:Model", "gemini-9-experimental"));
 
         await service.ExtractAsync("noreply@yepbooking.com", "Booking confirmed.");
@@ -213,7 +247,7 @@ public class GeminiBookingExtractionServiceTests
     public async Task Throws_when_every_field_comes_back_empty()
     {
         var (service, _) = NewService(_ => Candidate("""
-            {"venueName":null,"date":null,"startTime":null,"endTime":null,"cost":null,"currency":null}
+            {"venueName":null,"date":null,"courts":[],"cost":null,"currency":null}
             """));
 
         await Assert.ThrowsAsync<BookingExtractionException>(

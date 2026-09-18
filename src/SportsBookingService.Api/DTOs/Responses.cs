@@ -27,6 +27,8 @@ public record LocationResponse(Guid Id, string Name, string Address, string? Web
 
 public record CourtBookingResponse(Guid Id, string Court, string StartTime, string EndTime);
 
+public record ExtractedCourtBookingResponse(string? Court, string StartTime, string EndTime);
+
 public record ExpenseResponse(
     Guid Id,
     string Description,
@@ -89,6 +91,7 @@ public record PendingBookingResponse(
     string? ExtractedDate,
     string? ExtractedStartTime,
     string? ExtractedEndTime,
+    List<ExtractedCourtBookingResponse> ExtractedCourtBookings,
     decimal? ExtractedCost,
     string? ExtractedCurrency,
     string? ExtractedBookedByName,

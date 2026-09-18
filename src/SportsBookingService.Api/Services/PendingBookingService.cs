@@ -26,6 +26,7 @@ public class PendingBookingService(
             return ServiceResult<List<PendingBookingResponse>>.Fail(ServiceErrorKind.BadRequest, "Member not found in group.");
 
         var bookings = await db.PendingBookings
+            .Include(p => p.ExtractedCourtBookings)
             .Where(p => p.GroupId == groupId)
             .OrderByDescending(p => p.ReceivedAt)
             .ToListAsync();
@@ -136,6 +137,9 @@ public class PendingBookingService(
         p.ExtractedDate?.ToString("yyyy-MM-dd"),
         p.ExtractedStartTime,
         p.ExtractedEndTime,
+        p.ExtractedCourtBookings
+            .Select(c => new ExtractedCourtBookingResponse(c.Court, c.StartTime, c.EndTime))
+            .ToList(),
         p.ExtractedCost,
         p.ExtractedCurrency,
         p.ExtractedBookedByName,

@@ -62,8 +62,15 @@ public class AutoAcceptBookingTests : IDisposable
         decimal? cost = 48.50m,
         string? currency = "AUD",
         string? bookedByName = "Alice",
-        double confidence = 1.0) =>
-        new(venueName, date ?? FutureDate, startTime, endTime, cost, currency, bookedByName, confidence, "{}");
+        double confidence = 1.0,
+        IReadOnlyList<ExtractedCourtSlot>? courtSlots = null)
+    {
+        var slots = courtSlots ?? (startTime is not null && endTime is not null
+            ? new List<ExtractedCourtSlot> { new(null, startTime, endTime) }
+            : new List<ExtractedCourtSlot>());
+        return new(venueName, date ?? FutureDate, slots.FirstOrDefault()?.StartTime, slots.FirstOrDefault()?.EndTime,
+            cost, currency, bookedByName, slots, confidence, "{}");
+    }
 
     private async Task IngestAsync(BookingExtractionResult extraction)
     {
@@ -126,6 +133,26 @@ public class AutoAcceptBookingTests : IDisposable
         var expense = await db.Expenses.SingleAsync();
         Assert.Equal(48.50m, expense.Amount);
         Assert.Equal(aliceId, expense.PaidByMemberId);
+    }
+
+    [Fact]
+    public async Task Auto_accepts_a_multi_court_booking_when_every_slot_has_clean_times()
+    {
+        await IngestAsync(Extraction(courtSlots:
+        [
+            new ExtractedCourtSlot("3", "18:00", "20:00"),
+            new ExtractedCourtSlot("5", "18:00", "20:00"),
+        ]));
+
+        using var db = TestServices.NewContext(connection);
+        var pending = await db.PendingBookings.SingleAsync();
+        Assert.Equal(PendingBookingStatus.Confirmed, pending.Status);
+        Assert.True(pending.AutoAccepted);
+
+        var ev = await db.Events.Include(e => e.CourtBookings).SingleAsync();
+        Assert.Equal(2, ev.CourtBookings.Count);
+        Assert.Contains(ev.CourtBookings, c => c.Court == "3");
+        Assert.Contains(ev.CourtBookings, c => c.Court == "5");
     }
 
     [Fact]
